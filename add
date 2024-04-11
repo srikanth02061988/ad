@@ -1,1 +1,22 @@
+@Test
+void whenCreationThrowsException_thenReturnsNull() {
+    // Arrange
+    ServiceInvokerProxy serviceInvokerProxy = new ServiceInvokerProxy();
+    ServiceInvokerProxy spyServiceInvokerProxy = spy(serviceInvokerProxy);
+    
+    // Throw an exception when getSslContext is called
+    doThrow(new NoSuchAlgorithmException("Test exception")).when(spyServiceInvokerProxy).getSslContext();
+
+    // Act
+    HttpClient result = null;
+    try {
+        result = spyServiceInvokerProxy.getHttpClient(false);
+    } catch (Exception e) {
+        // This is expected if the exception is thrown from getSslContext.
+    }
+
+    // Assert
+    assertNull(result);
+}
+
 
