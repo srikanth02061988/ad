@@ -53,3 +53,24 @@ class ServiceInvokerProxyTest {
         assertEquals(0, trustManager.getAcceptedIssuers().length);
     }
 }
+
+
+
+import org.junit.jupiter.api.Test;
+import javax.net.ssl.SSLContext;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ServiceInvokerProxyTest {
+
+    private final ServiceInvokerProxy serviceInvokerProxy = new ServiceInvokerProxy();
+
+    @Test
+    void getSslContext_DoesNotThrowExceptions() {
+        // Act & Assert
+        assertDoesNotThrow(() -> {
+            SSLContext context = serviceInvokerProxy.getSslContext();
+            assertNotNull(context); // Check that an SSLContext is indeed created
+        });
+    }
+}
