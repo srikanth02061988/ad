@@ -1,0 +1,35 @@
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.net.MalformedURLException;
+import java.util.concurrent.ExecutionException;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(MockitoExtension.class)
+public class BlobStorageTriggerTest {
+
+    @Test
+    void testGetToken() throws MalformedURLException, ExecutionException, InterruptedException {
+        // Given
+        String clientId = "test-client-id";
+        String clientSecret = "test-client-secret";
+        String authority = "test-authority";
+        String resource = "test-resource";
+        String tenantId = "test-tenant-id";
+        String expectedToken = "test-token";
+
+        try (MockedStatic<BlobStorageTrigger> mocked = mockStatic(BlobStorageTrigger.class)) {
+            // When you call the static getToken method, return the expected token
+            mocked.when(() -> BlobStorageTrigger.getToken(clientId, clientSecret, authority, resource, tenantId))
+                  .thenReturn(expectedToken);
+            
+            // When
+            String actualToken = BlobStorageTrigger.getToken(clientId, clientSecret, authority, resource, tenantId);
+            
+            // Then
+            assertEquals(expectedToken, actualToken, "The token should match the expected value");
+        }
+    }
+}
