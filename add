@@ -1,101 +1,44 @@
-import org.junit.jupiter.api.*;
-import org.mockito.*;
-import static org.mockito.Mockito.*;
-import java.net.http.HttpResponse;
-import java.net.http.HttpClient;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+
 import java.net.URI;
-import org.json.JSONObject;
-
-class BlobStorageTriggerFunctionTest {
-
-    // Internal wrapper class within the test
-    private static class DatabricksUtilWrapper {
-        public HttpResponse<String> postRequest(URI uri, JSONObject payload) throws Exception {
-            return DatabricksUtil.getHttpClient(false).send(
-                DatabricksUtil.createPostRequest(uri, payload),
-                HttpResponse.BodyHandlers.ofString()
-            );
-        }
-    }
-
-    @Test
-    void testTriggerDBJob() throws Exception {
-        // Arrange
-        DatabricksUtilWrapper wrapper = Mockito.mock(DatabricksUtilWrapper.class);
-        HttpResponse<String> mockedResponse = Mockito.mock(HttpResponse.class);
-
-        // Prepare the mocked response
-        when(mockedResponse.body()).thenReturn("{\"run_id\": \"12345\"}");
-        when(mockedResponse.statusCode()).thenReturn(200);
-
-        // Mock the wrapper's postRequest method
-        when(wrapper.postRequest(any(URI.class), any(JSONObject.class)))
-            .thenReturn(mockedResponse);
-
-        // Initialize the function with the mocked wrapper
-        BlobStorageTriggerFunction function = new BlobStorageTriggerFunction(wrapper);
-
-        // Act
-        String result = function.triggerDBJob(new HashMap<>(), new JSONObject());
-
-        // Assert
-        Assertions.assertEquals("12345", result);
-
-        // Verify that the wrapper's postRequest method was called
-        verify(wrapper).postRequest(any(URI.class), any(JSONObject.class));
-    }
-}
-
-
-import org.junit.jupiter.api.*;
-import org.mockito.*;
-import static org.mockito.Mockito.*;
-import java.net.http.HttpResponse;
 import java.net.http.HttpClient;
-import java.net.URI;
 import java.net.http.HttpRequest;
-import org.json.JSONObject;
+import java.net.http.HttpResponse;
 
-class BlobStorageTriggerFunctionTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 
-    @BeforeEach
-    void setUp() {
-        // MockedStatic objects are scoped to the try-with-resources block
-        // We don't need it here because Mockito's JUnit extension takes care of that.
-    }
+class DatabricksUtilTest {
 
     @Test
-    void testTriggerDBJob() throws Exception {
-        // Arrange
+    void testCreatePostRequest() throws Exception {
+        // Mock the static methods of DatabricksUtil
         try (MockedStatic<DatabricksUtil> mockedDatabricksUtil = Mockito.mockStatic(DatabricksUtil.class)) {
-            HttpClient mockedHttpClient = mock(HttpClient.class);
-            HttpResponse<String> mockedResponse = mock(HttpResponse.class);
+            // Setup your HttpClient mock
+            HttpClient mockHttpClient = Mockito.mock(HttpClient.class);
+            HttpResponse<String> mockResponse = Mockito.mock(HttpResponse.class);
 
-            when(mockedResponse.body()).thenReturn("{\"run_id\": \"12345\"}");
-            when(mockedResponse.statusCode()).thenReturn(200);
+            Mockito.when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(mockResponse);
 
-            when(mockedHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(mockedResponse);
+            // Mocking static method calls
+            mockedDatabricksUtil.when(DatabricksUtil::getHttpClient)
+                    .thenReturn(mockHttpClient);
 
-            // Mock the static methods used in the triggerDBJob
-            mockedDatabricksUtil.when(() -> DatabricksUtil.getHttpClient(false))
-                .thenReturn(mockedHttpClient);
+            // Assume this is your expected URI
+            URI expectedUri = new URI("http://example.com/api/2.0/jobs/create");
 
-            mockedDatabricksUtil.when(() -> DatabricksUtil.createPostRequest(any(URI.class), any(JSONObject.class)))
-                .thenReturn(HttpRequest.newBuilder().uri(URI.create("http://example.com")).build());
+            // Mock the method we are testing
+            mockedDatabricksUtil.when(() -> DatabricksUtil.createJobCreateURI())
+                    .thenReturn(expectedUri);
 
-            BlobStorageTriggerFunction function = new BlobStorageTriggerFunction(); // Assuming a no-arg constructor
+            // Call the method under test
+            URI actualUri = DatabricksUtil.createJobCreateURI();
 
-            // Act
-            String result = function.triggerDBJob(new HashMap<>(), new JSONObject());
-
-            // Assert
-            Assertions.assertEquals("12345", result);
+            // Assert the result
+            assertEquals(expectedUri, actualUri);
         }
-    }
-
-    @AfterEach
-    void tearDown() {
-        // Clean up resources if needed, but the MockedStatic objects should be automatically closed.
     }
 }
