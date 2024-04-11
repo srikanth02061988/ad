@@ -143,3 +143,57 @@ public class AXCODE_KEYS_Test {
         assertNull(result, "The result should be null for an invalid key.");
     }
 }
+
+
+import org.json.JSONObject;
+import org.junit.jupiter.api.Test;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.util.UUID;
+import java.util.logging.Level;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class YourClassTest {
+
+    @Test
+    void logJSON_CreatesCorrectJSONObject() {
+        // Arrange
+        SEVERITY severity = SEVERITY.HIGH; // Adjust this based on your actual SEVERITY enum values
+        Level level = Level.SEVERE; // Use appropriate Level for your context
+        String category = "TestCategory";
+        String traceId = "TestTraceId";
+        String message = "Test message";
+
+        // Capture the System.out output
+        ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(outContent));
+
+        // Act
+        YourClass.logJSON(severity, level, category, traceId, message);
+
+        // Reset the System.out back to its original stream
+        System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out)));
+
+        // Assert
+        JSONObject loggedJson = new JSONObject(outContent.toString());
+
+        // Assert that all keys exist and have expected values
+        assertEquals("APP", loggedJson.getString("EXCEPTIONTYPE"));
+        assertEquals(level.getName(), loggedJson.getString("LEVEL")); // Level might be a custom type in your code
+        assertEquals(YourExpectedAxcodeValue, loggedJson.getString("AXCODE")); // Replace with the expected AXCODE value
+        assertTrue(loggedJson.has("ID")); // ID should exist, and is a UUID without dashes
+        String id = loggedJson.getString("ID");
+        assertEquals(32, id.length()); // UUID without dashes should be 32 characters long
+        assertFalse(id.contains("-"));
+        assertEquals(message, loggedJson.getString("MESSAGE"));
+        assertEquals(category, loggedJson.getString("CATEGORY"));
+        assertEquals(traceId, loggedJson.getString("TRACEID"));
+
+        // Validate UUID format and value
+        assertDoesNotThrow(() -> UUID.fromString(
+            id.replaceFirst("(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{12})",
+            "$1-$2-$3-$4"))
+        );
+    }
+}
