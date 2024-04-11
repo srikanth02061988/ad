@@ -33,3 +33,43 @@ public class BlobStorageTriggerTest {
         }
     }
 }
+
+
+import org.junit.jupiter.api.Test;
+import static org.mockito.Mockito.*;
+import java.net.URI;
+import java.net.http.HttpRequest;
+import org.json.JSONObject;
+
+class BlobStorageTriggerTest {
+
+    @Test
+    void createPostRequestTest() throws Exception {
+        // Arrange
+        URI uri = new URI("http://example.com");
+        JSONObject payload = new JSONObject();
+        payload.put("exampleKey", "exampleValue");
+        String clientId = "uniqueClientId";
+        String clientSecret = "uniqueClientSecret";
+        String authority = "uniqueAuthority";
+        String resource = "uniqueResource";
+        String tenantId = "uniqueTenantId";
+        String expectedToken = "uniqueToken";
+
+        BlobStorageTrigger mockBlobStorageTrigger = mock(BlobStorageTrigger.class);
+        when(mockBlobStorageTrigger.getToken(clientId, clientSecret, authority, resource, tenantId)).thenReturn(expectedToken);
+
+        // Act
+        HttpRequest actualRequest = BlobStorageTrigger.createPostRequest(uri, payload);
+
+        // Assert
+        // Verify the method called getToken with unique parameters
+        verify(mockBlobStorageTrigger).getToken(clientId, clientSecret, authority, resource, tenantId);
+        // Additional assertions to verify the HttpRequest object has the correct properties
+        assertNotNull(actualRequest);
+        assertEquals("POST", actualRequest.method());
+        assertTrue(actualRequest.headers().map().containsKey("Authorization"));
+        assertEquals("Bearer " + expectedToken, actualRequest.headers().map().get("Authorization").get(0));
+        // ... (potentially more assertions to verify the payload, URI, etc.)
+    }
+}
