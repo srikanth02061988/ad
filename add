@@ -73,3 +73,48 @@ class BlobStorageTriggerTest {
         // ... (potentially more assertions to verify the payload, URI, etc.)
     }
 }
+
+
+import static org.mockito.Mockito.*;
+
+import java.net.URI;
+import java.net.http.HttpRequest;
+import org.json.JSONObject;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.extension.ExtendWith;
+
+@ExtendWith(MockitoExtension.class)
+class BlobStorageTriggerTest {
+
+    @Test
+    void createPostRequestTest() throws Exception {
+        // Arrange
+        URI uri = new URI("http://example.com");
+        JSONObject payload = new JSONObject();
+        payload.put("exampleKey", "exampleValue");
+        String clientId = "uniqueClientId";
+        String clientSecret = "uniqueClientSecret";
+        String authority = "https://uniqueAuthority";
+        String resource = "uniqueResource";
+        String tenantId = "uniqueTenantId";
+        String expectedToken = "uniqueToken";
+
+        try (MockedStatic<BlobStorageTrigger> mockedStatic = mockStatic(BlobStorageTrigger.class)) {
+            // When you call the static getToken method, return the expected token
+            mockedStatic.when(() -> BlobStorageTrigger.getToken(anyString(), anyString(), anyString(), anyString(), anyString()))
+                        .thenReturn(expectedToken);
+            
+            // Act
+            HttpRequest actualRequest = BlobStorageTrigger.createPostRequest(uri, payload);
+
+            // Assert
+            assertNotNull(actualRequest);
+            assertEquals("POST", actualRequest.method());
+            assertTrue(actualRequest.headers().map().containsKey("Authorization"));
+            assertEquals("Bearer " + expectedToken, actualRequest.headers().map().get("Authorization").get(0));
+            // ... (potentially more assertions to verify the payload, URI, etc.)
+        }
+    }
+}
