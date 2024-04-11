@@ -74,3 +74,56 @@ class ServiceInvokerProxyTest {
         });
     }
 }
+
+
+import org.junit.jupiter.api.Test;
+import javax.net.ssl.X509TrustManager;
+import java.security.cert.X509Certificate;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class TrustManagerTest {
+
+    @Test
+    void trustManagerDoesNotThrowExceptions() throws Exception {
+        // Arrange
+        X509TrustManager trustManager = new CustomTrustManager(); // Replace with your custom trust manager class
+        X509Certificate[] chain = new X509Certificate[]{}; // An empty certificate chain
+
+        // Act & Assert
+        assertDoesNotThrow(() -> trustManager.checkClientTrusted(chain, "RSA"));
+        assertDoesNotThrow(() -> trustManager.checkServerTrusted(chain, "RSA"));
+    }
+
+    @Test
+    void getAcceptedIssuersReturnsEmptyArray() throws Exception {
+        // Arrange
+        X509TrustManager trustManager = new CustomTrustManager(); // Replace with your custom trust manager class
+
+        // Act
+        X509Certificate[] acceptedIssuers = trustManager.getAcceptedIssuers();
+
+        // Assert
+        assertNotNull(acceptedIssuers);
+        assertEquals(0, acceptedIssuers.length);
+    }
+
+    // A hypothetical custom trust manager class that always trusts
+    // Replace this with your actual trust manager implementation
+    static class CustomTrustManager implements X509TrustManager {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) {
+            // Trust all clients
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+            // Trust all servers
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
+    }
+}
