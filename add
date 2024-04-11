@@ -1,238 +1,34 @@
-@Test
-void whenCreationThrowsException_thenReturnsNull() {
-    // Arrange
-    ServiceInvokerProxy serviceInvokerProxy = new ServiceInvokerProxy();
-    ServiceInvokerProxy spyServiceInvokerProxy = spy(serviceInvokerProxy);
-    
-    // Throw an exception when getSslContext is called
-    doThrow(new NoSuchAlgorithmException("Test exception")).when(spyServiceInvokerProxy).getSslContext();
-
-    // Act
-    HttpClient result = null;
-    try {
-        result = spyServiceInvokerProxy.getHttpClient(false);
-    } catch (Exception e) {
-        // This is expected if the exception is thrown from getSslContext.
-    }
-
-    // Assert
-    assertNull(result);
-}
-
-
-import org.junit.jupiter.api.Test;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import java.security.cert.X509Certificate;
-
-import static org.junit.jupiter.api.Assertions.*;
-
-class ServiceInvokerProxyTest {
-
-    @Test
-    void getSslContext_ReturnsSSLContextWithTrustAllCertsTrustManager() throws Exception {
-        // Act
-        SSLContext context = new ServiceInvokerProxy().getSslContext();
-
-        // Assert
-        assertNotNull(context);
-
-        // Assert that the SSLContext has been initialized with a trust manager that trusts all certs
-        TrustManager[] trustManagers = context.getTrustManagers();
-        assertNotNull(trustManagers);
-        assertTrue(trustManagers.length > 0);
-        assertTrue(trustManagers[0] instanceof X509TrustManager);
-        X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
-
-        // Assert that the trust manager doesn't throw any CertificateException
-        assertDoesNotThrow(() -> trustManager.checkClientTrusted(new X509Certificate[]{}, "RSA"));
-        assertDoesNotThrow(() -> trustManager.checkServerTrusted(new X509Certificate[]{}, "RSA"));
-        
-        // The getAcceptedIssuers should return an empty array
-        assertEquals(0, trustManager.getAcceptedIssuers().length);
-    }
-}
-
-
-
-import org.junit.jupiter.api.Test;
-import javax.net.ssl.SSLContext;
-
-import static org.junit.jupiter.api.Assertions.*;
-
-class ServiceInvokerProxyTest {
-
-    private final ServiceInvokerProxy serviceInvokerProxy = new ServiceInvokerProxy();
-
-    @Test
-    void getSslContext_DoesNotThrowExceptions() {
-        // Act & Assert
-        assertDoesNotThrow(() -> {
-            SSLContext context = serviceInvokerProxy.getSslContext();
-            assertNotNull(context); // Check that an SSLContext is indeed created
-        });
-    }
-}
-
-
-import org.junit.jupiter.api.Test;
-import javax.net.ssl.X509TrustManager;
-import java.security.cert.X509Certificate;
-
-import static org.junit.jupiter.api.Assertions.*;
-
-class TrustManagerTest {
-
-    @Test
-    void trustManagerDoesNotThrowExceptions() throws Exception {
-        // Arrange
-        X509TrustManager trustManager = new CustomTrustManager(); // Replace with your custom trust manager class
-        X509Certificate[] chain = new X509Certificate[]{}; // An empty certificate chain
-
-        // Act & Assert
-        assertDoesNotThrow(() -> trustManager.checkClientTrusted(chain, "RSA"));
-        assertDoesNotThrow(() -> trustManager.checkServerTrusted(chain, "RSA"));
-    }
-
-    @Test
-    void getAcceptedIssuersReturnsEmptyArray() throws Exception {
-        // Arrange
-        X509TrustManager trustManager = new CustomTrustManager(); // Replace with your custom trust manager class
-
-        // Act
-        X509Certificate[] acceptedIssuers = trustManager.getAcceptedIssuers();
-
-        // Assert
-        assertNotNull(acceptedIssuers);
-        assertEquals(0, acceptedIssuers.length);
-    }
-
-    // A hypothetical custom trust manager class that always trusts
-    // Replace this with your actual trust manager implementation
-    static class CustomTrustManager implements X509TrustManager {
-        @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) {
-            // Trust all clients
-        }
-
-        @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) {
-            // Trust all servers
-        }
-
-        @Override
-        public X509Certificate[] getAcceptedIssuers() {
-            return new X509Certificate[0];
-        }
-    }
-}
-
-
- @Test
-    void trustManagerMethodsAreInvoked() throws Exception {
-        // Arrange
-        X509TrustManager trustManager = new CustomTrustManager();
-        SSLContext context = SSLContext.getInstance("TLS");
-        context.init(null, new TrustManager[]{trustManager}, new SecureRandom());
-        X509Certificate[] chain = new X509Certificate[]{};
-
-        // Act & Assert - checkClientTrusted and checkServerTrusted
-        trustManager.checkClientTrusted(chain, "RSA");
-        trustManager.checkServerTrusted(chain, "RSA");
-
-        // Verify that no exceptions are thrown and methods are invoked
-        assertDoesNotThrow(() -> trustManager.checkClientTrusted(chain, "RSA"));
-        assertDoesNotThrow(() -> trustManager.checkServerTrusted(chain, "RSA"));
-
-        // Act & Assert - getAcceptedIssuers
-        X509Certificate[] acceptedIssuers = trustManager.getAcceptedIssuers();
-        assertNotNull(acceptedIssuers);
-        assertEquals(0, acceptedIssuers.length);
-    }
-
-    // CustomTrustManager implementation here...
-}
-
-
-import org.json.JSONObject;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
-import java.net.URI;
-import java.net.http.HttpRequest;
-
 import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import java.net.http.HttpResponse;
+import java.net.http.HttpClient;
 
-@ExtendWith(MockitoExtension.class)
-class YourClassTest {
+class BlobStorageTriggerFunctionTest {
 
     @BeforeEach
     void setUp() {
-        // Setup that runs before each test case
+        try (MockedStatic<DatabricksUtil> mockedStatic = Mockito.mockStatic(DatabricksUtil.class)) {
+            // Prepare the HttpClient and Response mocks
+            HttpClient client = mock(HttpClient.class);
+            HttpResponse<String> response = mock(HttpResponse.class);
+            when(response.body()).thenReturn("{\"run_id\": \"12345\"}");
+            when(response.statusCode()).thenReturn(200);
+            when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response);
+
+            // Mock static methods
+            mockedStatic.when(() -> DatabricksUtil.createPostRequest(any(URI.class), any(JSONObject.class)))
+                .thenReturn(mock(HttpRequest.class));
+            mockedStatic.when(() -> DatabricksUtil.getHttpClient(anyBoolean()))
+                .thenReturn(client);
+        }
     }
 
     @Test
-    void createPostRequest_ReturnsCorrectlyConfiguredHttpRequest() {
-        // Arrange
-        URI testUri = URI.create("http://example.com");
-        JSONObject testPayload = new JSONObject();
-        testPayload.put("key", "value");
-        String expectedToken = "testToken";
-
-        try (MockedStatic<YourClass> utilities = Mockito.mockStatic(YourClass.class)) {
-            // Mock the static getToken method
-            utilities.when(() -> YourClass.getToken()).thenReturn(expectedToken);
-
-            // Act
-            HttpRequest request = YourClass.createPostRequest(testUri, testPayload);
-
-            // Assert
-            assertNotNull(request);
-            assertEquals("POST", request.method());
-            assertEquals("Bearer " + expectedToken, request.headers().firstValue("Authorization").orElse(""));
-            assertEquals(testPayload.toString(), HttpRequest.BodyPublishers.ofString(testPayload.toString()).contentLength());
-            assertEquals(testUri, request.uri());
-        }
+    void testTriggerDBJob() throws Exception {
+        BlobStorageTriggerFunction function = new BlobStorageTriggerFunction();
+        String result = function.triggerDBJob(new HashMap<>(), new JSONObject());
+        Assertions.assertEquals("12345", result);
     }
 }
-
-import org.json.JSONObject;
-import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
-import java.net.URI;
-import java.net.http.HttpRequest;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockStatic;
-import static org.junit.jupiter.api.Assertions.*;
-
-class DatabricksUtilTest {
-
-    @Test
-    void testCreateGetRequest() {
-        URI testUri = URI.create("http://example.com/api");
-        JSONObject testPayload = new JSONObject();
-        testPayload.put("key", "value");
-        String fakeToken = "fakeToken";
-
-        try (MockedStatic<DatabricksUtil> mocked = mockStatic(DatabricksUtil.class)) {
-            // Mock the getToken method to return a fake token
-            mocked.when(() -> DatabricksUtil.getToken(any(), any(), any(), any(), any())).thenReturn(fakeToken);
-
-            // Now call the method under test
-            HttpRequest request = DatabricksUtil.createPostRequest(testUri, testPayload);
-
-            // Assertions
-            assertNotNull(request);
-            assertEquals("POST", request.method());
-            assertEquals("Bearer " + fakeToken, request.headers().firstValue("Authorization").orElse(""));
-            // Additional assertions can be made here
-        }
-    }
-}
-
