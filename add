@@ -199,3 +199,40 @@ class YourClassTest {
         }
     }
 }
+
+import org.json.JSONObject;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import java.net.URI;
+import java.net.http.HttpRequest;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
+import static org.junit.jupiter.api.Assertions.*;
+
+class DatabricksUtilTest {
+
+    @Test
+    void testCreateGetRequest() {
+        URI testUri = URI.create("http://example.com/api");
+        JSONObject testPayload = new JSONObject();
+        testPayload.put("key", "value");
+        String fakeToken = "fakeToken";
+
+        try (MockedStatic<DatabricksUtil> mocked = mockStatic(DatabricksUtil.class)) {
+            // Mock the getToken method to return a fake token
+            mocked.when(() -> DatabricksUtil.getToken(any(), any(), any(), any(), any())).thenReturn(fakeToken);
+
+            // Now call the method under test
+            HttpRequest request = DatabricksUtil.createPostRequest(testUri, testPayload);
+
+            // Assertions
+            assertNotNull(request);
+            assertEquals("POST", request.method());
+            assertEquals("Bearer " + fakeToken, request.headers().firstValue("Authorization").orElse(""));
+            // Additional assertions can be made here
+        }
+    }
+}
+
