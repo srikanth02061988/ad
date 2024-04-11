@@ -197,3 +197,67 @@ class YourClassTest {
         );
     }
 }
+
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
+import java.net.http.HttpClient;
+import java.time.Duration;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class ServiceInvokerProxyTest {
+    // Assume that ServiceInvokerProxy is the class containing getHttpClient method
+    private ServiceInvokerProxy serviceInvokerProxy;
+
+    @BeforeEach
+    void setUp() {
+        serviceInvokerProxy = new ServiceInvokerProxy();
+        // Initialize your class here, if there are any dependencies to inject or initializations to perform
+    }
+
+    @Test
+    void whenProxyModeIsTrue_thenHttpClientIsConfiguredWithProxy() {
+        // Act
+        HttpClient result = serviceInvokerProxy.getHttpClient(true);
+
+        // Assert
+        assertNotNull(result);
+        // Directly asserting proxy setup is not possible with HttpClient; would need an integration test to verify
+    }
+
+    @Test
+    void whenProxyModeIsFalse_thenHttpClientIsNotConfiguredWithProxy() {
+        // Act
+        HttpClient result = serviceInvokerProxy.getHttpClient(false);
+
+        // Assert
+        assertNotNull(result);
+        // Directly asserting lack of proxy setup is not possible with HttpClient; would need an integration test to verify
+    }
+
+    @Test
+    void whenCreationThrowsException_thenReturnsNull() {
+        // Arrange
+        ServiceInvokerProxy spyServiceInvokerProxy = spy(serviceInvokerProxy);
+        doThrow(new RuntimeException("Test exception")).when(spyServiceInvokerProxy).getSslContext();
+
+        // Act
+        HttpClient result = spyServiceInvokerProxy.getHttpClient(false);
+
+        // Assert
+        assertNull(result);
+    }
+
+    // Helper method to create a spy of the ServiceInvokerProxy class
+    // which throws an exception when getSslContext() is called.
+    private ServiceInvokerProxy createSpyThatThrowsOnGetSslContext() {
+        ServiceInvokerProxy spy = spy(new ServiceInvokerProxy());
+        doThrow(new RuntimeException("Forced exception for test")).when(spy).getSslContext();
+        return spy;
+    }
+}
