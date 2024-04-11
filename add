@@ -20,3 +20,36 @@ void whenCreationThrowsException_thenReturnsNull() {
 }
 
 
+import org.junit.jupiter.api.Test;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.security.cert.X509Certificate;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ServiceInvokerProxyTest {
+
+    @Test
+    void getSslContext_ReturnsSSLContextWithTrustAllCertsTrustManager() throws Exception {
+        // Act
+        SSLContext context = new ServiceInvokerProxy().getSslContext();
+
+        // Assert
+        assertNotNull(context);
+
+        // Assert that the SSLContext has been initialized with a trust manager that trusts all certs
+        TrustManager[] trustManagers = context.getTrustManagers();
+        assertNotNull(trustManagers);
+        assertTrue(trustManagers.length > 0);
+        assertTrue(trustManagers[0] instanceof X509TrustManager);
+        X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
+
+        // Assert that the trust manager doesn't throw any CertificateException
+        assertDoesNotThrow(() -> trustManager.checkClientTrusted(new X509Certificate[]{}, "RSA"));
+        assertDoesNotThrow(() -> trustManager.checkServerTrusted(new X509Certificate[]{}, "RSA"));
+        
+        // The getAcceptedIssuers should return an empty array
+        assertEquals(0, trustManager.getAcceptedIssuers().length);
+    }
+}
