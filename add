@@ -32,3 +32,46 @@ class BlobStorageTriggerFunctionTest {
         Assertions.assertEquals("12345", result);
     }
 }
+
+
+import org.junit.jupiter.api.*;
+import org.mockito.*;
+import java.net.http.HttpResponse;
+import java.net.http.HttpClient;
+import java.net.URI;
+import java.net.http.HttpRequest;
+
+import static org.mockito.Mockito.*;
+
+class BlobStorageTriggerFunctionTest {
+
+    @Test
+    void testTriggerDBJob() throws Exception {
+        // Arrange
+        try (MockedStatic<DatabricksUtil> utilities = Mockito.mockStatic(DatabricksUtil.class)) {
+            // Mock the static methods used in the triggerDBJob
+            HttpClient mockedClient = mock(HttpClient.class);
+            HttpResponse<String> mockedResponse = mock(HttpResponse.class);
+            
+            when(mockedResponse.body()).thenReturn("{\"run_id\": \"12345\"}");
+            when(mockedResponse.statusCode()).thenReturn(200);
+            
+            when(mockedClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(mockedResponse);
+            
+            utilities.when(() -> DatabricksUtil.getHttpClient(false))
+                .thenReturn(mockedClient);
+            
+            utilities.when(() -> DatabricksUtil.createPostRequest(any(URI.class), any(JSONObject.class)))
+                .thenReturn(HttpRequest.newBuilder().uri(URI.create("http://example.com")).build());
+            
+            BlobStorageTriggerFunction function = new BlobStorageTriggerFunction();
+            
+            // Act
+            String result = function.triggerDBJob(new HashMap<>(), new JSONObject());
+            
+            // Assert
+            Assertions.assertEquals("12345", result);
+        }
+    }
+}
