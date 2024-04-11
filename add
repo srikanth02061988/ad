@@ -118,3 +118,28 @@ class BlobStorageTriggerTest {
         }
     }
 }
+
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
+
+public class AXCODE_KEYS_Test {
+
+    @Test
+    public void getEnumReturnsCorrectEnumForValidKey() {
+        // Assuming that "example" is a valid key in the AXCODE_KEYS enum.
+        String validKey = "example";
+        AXCODE_KEYS result = BlobStorageTrigger.getEnum(validKey);
+        assertNotNull(result, "The result should not be null for a valid key.");
+        assertEquals(AXCODE_KEYS.EXAMPLE_KEY, result, "The result should match the corresponding enum constant.");
+    }
+
+    @Test
+    public void getEnumReturnsNullForInvalidKey() {
+        // Use a key that is guaranteed not to be in the AXCODE_KEYS enum.
+        String invalidKey = "nonexistent_key";
+        AXCODE_KEYS result = BlobStorageTrigger.getEnum(invalidKey);
+        assertNull(result, "The result should be null for an invalid key.");
+    }
+}
