@@ -153,3 +153,49 @@ class TrustManagerTest {
 
     // CustomTrustManager implementation here...
 }
+
+
+import org.json.JSONObject;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.net.URI;
+import java.net.http.HttpRequest;
+
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(MockitoExtension.class)
+class YourClassTest {
+
+    @BeforeEach
+    void setUp() {
+        // Setup that runs before each test case
+    }
+
+    @Test
+    void createPostRequest_ReturnsCorrectlyConfiguredHttpRequest() {
+        // Arrange
+        URI testUri = URI.create("http://example.com");
+        JSONObject testPayload = new JSONObject();
+        testPayload.put("key", "value");
+        String expectedToken = "testToken";
+
+        try (MockedStatic<YourClass> utilities = Mockito.mockStatic(YourClass.class)) {
+            // Mock the static getToken method
+            utilities.when(() -> YourClass.getToken()).thenReturn(expectedToken);
+
+            // Act
+            HttpRequest request = YourClass.createPostRequest(testUri, testPayload);
+
+            // Assert
+            assertNotNull(request);
+            assertEquals("POST", request.method());
+            assertEquals("Bearer " + expectedToken, request.headers().firstValue("Authorization").orElse(""));
+            assertEquals(testPayload.toString(), HttpRequest.BodyPublishers.ofString(testPayload.toString()).contentLength());
+            assertEquals(testUri, request.uri());
+        }
+    }
+}
