@@ -45,3 +45,57 @@ class BlobStorageTriggerFunctionTest {
         verify(wrapper).postRequest(any(URI.class), any(JSONObject.class));
     }
 }
+
+
+import org.junit.jupiter.api.*;
+import org.mockito.*;
+import static org.mockito.Mockito.*;
+import java.net.http.HttpResponse;
+import java.net.http.HttpClient;
+import java.net.URI;
+import java.net.http.HttpRequest;
+import org.json.JSONObject;
+
+class BlobStorageTriggerFunctionTest {
+
+    @BeforeEach
+    void setUp() {
+        // MockedStatic objects are scoped to the try-with-resources block
+        // We don't need it here because Mockito's JUnit extension takes care of that.
+    }
+
+    @Test
+    void testTriggerDBJob() throws Exception {
+        // Arrange
+        try (MockedStatic<DatabricksUtil> mockedDatabricksUtil = Mockito.mockStatic(DatabricksUtil.class)) {
+            HttpClient mockedHttpClient = mock(HttpClient.class);
+            HttpResponse<String> mockedResponse = mock(HttpResponse.class);
+
+            when(mockedResponse.body()).thenReturn("{\"run_id\": \"12345\"}");
+            when(mockedResponse.statusCode()).thenReturn(200);
+
+            when(mockedHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(mockedResponse);
+
+            // Mock the static methods used in the triggerDBJob
+            mockedDatabricksUtil.when(() -> DatabricksUtil.getHttpClient(false))
+                .thenReturn(mockedHttpClient);
+
+            mockedDatabricksUtil.when(() -> DatabricksUtil.createPostRequest(any(URI.class), any(JSONObject.class)))
+                .thenReturn(HttpRequest.newBuilder().uri(URI.create("http://example.com")).build());
+
+            BlobStorageTriggerFunction function = new BlobStorageTriggerFunction(); // Assuming a no-arg constructor
+
+            // Act
+            String result = function.triggerDBJob(new HashMap<>(), new JSONObject());
+
+            // Assert
+            Assertions.assertEquals("12345", result);
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Clean up resources if needed, but the MockedStatic objects should be automatically closed.
+    }
+}
