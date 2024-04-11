@@ -127,3 +127,29 @@ class TrustManagerTest {
         }
     }
 }
+
+
+ @Test
+    void trustManagerMethodsAreInvoked() throws Exception {
+        // Arrange
+        X509TrustManager trustManager = new CustomTrustManager();
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(null, new TrustManager[]{trustManager}, new SecureRandom());
+        X509Certificate[] chain = new X509Certificate[]{};
+
+        // Act & Assert - checkClientTrusted and checkServerTrusted
+        trustManager.checkClientTrusted(chain, "RSA");
+        trustManager.checkServerTrusted(chain, "RSA");
+
+        // Verify that no exceptions are thrown and methods are invoked
+        assertDoesNotThrow(() -> trustManager.checkClientTrusted(chain, "RSA"));
+        assertDoesNotThrow(() -> trustManager.checkServerTrusted(chain, "RSA"));
+
+        // Act & Assert - getAcceptedIssuers
+        X509Certificate[] acceptedIssuers = trustManager.getAcceptedIssuers();
+        assertNotNull(acceptedIssuers);
+        assertEquals(0, acceptedIssuers.length);
+    }
+
+    // CustomTrustManager implementation here...
+}
