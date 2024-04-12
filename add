@@ -1,11 +1,15 @@
-import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
-
+import com.microsoft.azure.storage.CloudStorageAccount;
+import com.microsoft.azure.storage.blob.CloudBlobClient;
+import com.microsoft.azure.storage.blob.CloudBlobContainer;
+import com.microsoft.azure.storage.blob.CloudBlockBlob;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class BlobStorageTriggerFunctionTest {
@@ -13,37 +17,55 @@ public class BlobStorageTriggerFunctionTest {
     @Mock
     private ExecutionContext context;
     @Mock
-    private Logger logger;
+    private CloudBlobClient mockBlobClient;
+    @Mock
+    private CloudBlobContainer mockBlobContainer;
+    @Mock
+    private CloudBlockBlob mockBlockBlob;
+    @Mock
+    private Logger mockLogger;
 
     private BlobStorageTriggerFunction function;
-    private final String storageAccountName = "teststorageaccount";
-    private final String containerName = "testcontainer";
-    private final String blobName = "test-blob.txt";
-    private final String subFolder = "testsubfolder";
-    private final String FullFilePath = subFolder + "/" + blobName;
+    private final String connectionString = "DefaultEndpointsProtocol=https;AccountName=yourAccountName;AccountKey=yourAccountKey;EndpointSuffix=core.windows.net";
+    private final String containerName = "yourContainerName";
+    private final String blobName = "yourBlobName";
+    private final String subFolder = "yourSubFolder";
+    private final String fullFilePath = subFolder + "/" + blobName;
 
     @BeforeEach
     void setUp() {
         function = new BlobStorageTriggerFunction();
-        when(context.getLogger()).thenReturn(logger);
-        
-        // Mocking environment variables (or you could use a library like JUnit Pioneer to handle environment variables)
+        when(context.getLogger()).thenReturn(mockLogger);
+
+        // Set system properties for your environment variables.
+        // This is for the purpose of the test and should match your actual environment setup.
         System.setProperty("AZURE_STORAGE_CONTAINER", containerName);
         System.setProperty("Azure_STORAGE_SUBFOLDER", subFolder);
+
+        // Mocking CloudStorageAccount.parse to return a mock CloudStorageAccount object
+        try (MockedStatic<CloudStorageAccount> cloudStorageAccountMockedStatic = mockStatic(CloudStorageAccount.class)) {
+            CloudStorageAccount mockCloudStorageAccount = mock(CloudStorageAccount.class);
+            when(mockCloudStorageAccount.createCloudBlobClient()).thenReturn(mockBlobClient);
+            when(mockBlobClient.getContainerReference(anyString())).thenReturn(mockBlobContainer);
+            when(mockBlobContainer.getBlockBlobReference(anyString())).thenReturn(mockBlockBlob);
+
+            cloudStorageAccountMockedStatic.when(() -> CloudStorageAccount.parse(connectionString))
+                                           .thenReturn(mockCloudStorageAccount);
+        }
     }
 
     @Test
     void testBlobTriggerInvocation() {
         // Arrange
         String blobContent = "This is a test blob content.";
-        String expectedLogMessage = "Constructed Blob URL: https://teststorageaccount.blob.core.windows.net/testcontainer/testsubfolder/test-blob.txt";
+        String expectedLogMessage = "Constructed Blob URL: https://yourAccountName.blob.core.windows.net/yourContainerName/yourSubFolder/yourBlobName";
 
         // Act
         function.run(blobContent, blobName, context);
 
         // Assert
         verify(context).getLogger();
-        verify(logger).info(contains(expectedLogMessage));
+        verify(mockLogger).info(contains(expectedLogMessage));
         assertDoesNotThrow(() -> function.run(blobContent, blobName, context));
     }
 }
