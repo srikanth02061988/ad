@@ -1,40 +1,49 @@
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-import com.microsoft.azure.functions.ExecutionContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class BlobStorageTriggerFunctionTest {
+public class BlobStorageTriggerFunctionTest {
 
+    @Mock
     private ExecutionContext context;
+    @Mock
+    private Logger logger;
+
     private BlobStorageTriggerFunction function;
+    private final String storageAccountName = "teststorageaccount";
+    private final String containerName = "testcontainer";
+    private final String blobName = "test-blob.txt";
+    private final String subFolder = "testsubfolder";
+    private final String FullFilePath = subFolder + "/" + blobName;
 
     @BeforeEach
     void setUp() {
-        context = mock(ExecutionContext.class);
         function = new BlobStorageTriggerFunction();
-        // Additional setup for Azure storage mocks could be done here
+        when(context.getLogger()).thenReturn(logger);
+        
+        // Mocking environment variables (or you could use a library like JUnit Pioneer to handle environment variables)
+        System.setProperty("AZURE_STORAGE_CONTAINER", containerName);
+        System.setProperty("Azure_STORAGE_SUBFOLDER", subFolder);
     }
 
     @Test
     void testBlobTriggerInvocation() {
         // Arrange
-        String expectedLogMessage = "blob Created:";
         String blobContent = "This is a test blob content.";
-        String blobName = "test-blob.txt";
+        String expectedLogMessage = "Constructed Blob URL: https://teststorageaccount.blob.core.windows.net/testcontainer/testsubfolder/test-blob.txt";
 
         // Act
         function.run(blobContent, blobName, context);
 
         // Assert
         verify(context).getLogger();
-        verify(context.getLogger()).info(contains(expectedLogMessage + blobName));
-
-        // Optionally, assert that no exceptions were thrown
+        verify(logger).info(contains(expectedLogMessage));
         assertDoesNotThrow(() -> function.run(blobContent, blobName, context));
     }
 }
