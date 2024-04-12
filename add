@@ -23,3 +23,103 @@ public class StorageConnectionStringTest {
         }
     }
 }
+
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Map;
+import java.util.HashMap;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class BlobStorageTriggerFunctionTest {
+
+    @Mock
+    private ExecutionContext context;
+    @Mock
+    private Logger logger;
+    @Mock
+    private PGDbConnection dbConnection;
+    @Mock
+    private Connection sqlConnection;
+    @Mock
+    private PreparedStatement preparedStatement;
+    @Mock
+    private ResultSet resultSet;
+
+    private BlobStorageTriggerFunction function;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        setEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING", "your_actual_connection_string");
+        when(context.getLogger()).thenReturn(logger);
+        when(dbConnection.getConnection()).thenReturn(sqlConnection);
+        when(sqlConnection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        function = new BlobStorageTriggerFunction(dbConnection); // Assuming the function can accept a dbConnection.
+    }
+
+    @Test
+    void testDatabaseQueryExecution() throws Exception {
+        // Arrange
+        String blobName = "exampleBlob.txt";
+        String expectedQuery = "SELECT * FROM your_table WHERE blob_name = ?";
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true); // Simulate a result being found
+        when(resultSet.getString("metadata_field")).thenReturn("metadata_value");
+
+        // Act
+        function.run("<BLOB CONTENTS>", blobName, context);
+
+        // Assert
+        verify(preparedStatement).setString(1, blobName);
+        verify(preparedStatement).executeQuery();
+        verify(logger).info(contains("Metadata field value: metadata_value"));
+    }
+
+    // ... Existing @AfterEach method and reflection methods ...
+
+   @AfterEach
+    void cleanUp() throws Exception {
+        clearEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING");
+    }
+
+    private static void setEnvironmentVariable(String key, String value) throws Exception {
+        Field field = System.class.getDeclaredField("env");
+        field.setAccessible(true);
+
+        Map<String, String> env = (Map<String, String>) field.get(null);
+        if (env instanceof HashMap) {
+            field = HashMap.class.getDeclaredField("modifiable");
+            field.setAccessible(true);
+            field.setBoolean(env, true);
+        }
+
+        env.put(key, value);
+    }
+
+    private static void clearEnvironmentVariable(String key) throws Exception {
+        Field field = System.class.getDeclaredField("env");
+        field.setAccessible(true);
+
+        Map<String, String> env = (Map<String, String>) field.get(null);
+        if (env instanceof HashMap) {
+            field = HashMap.class.getDeclaredField("modifiable");
+            field.setAccessible(true);
+            field.setBoolean(env, true);
+        }
+
+        env.remove(key);
+    }
+}
