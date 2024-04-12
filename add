@@ -42,3 +42,68 @@ class DatabricksUtilTest {
         }
     }
 }
+
+
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
+
+class BlobStorageTriggerFunctionTest {
+
+    @Test
+    void testTriggerDBJob() throws Exception {
+        // Arrange
+        Map<String, Object> params = new HashMap<>();
+        JSONObject messageJson = new JSONObject(); // Populate as needed
+
+        // Create a mocked response for the HttpClient
+        HttpResponse<String> mockedResponse = mock(HttpResponse.class);
+        when(mockedResponse.body()).thenReturn("{\"run_id\":\"12345\"}");
+
+        // Mock DatabricksUtil static methods
+        try (MockedStatic<DatabricksUtil> mockedUtilities = Mockito.mockStatic(DatabricksUtil.class)) {
+            // Mock the getToken method if it is used in the static methods
+            // Assume getToken() is a method returning a String token
+            mockedUtilities.when(DatabricksUtil::getToken).thenReturn("mock_token");
+
+            // Mock the createPostRequest method
+            HttpRequest mockRequest = HttpRequest.newBuilder().uri(new URI("http://mockuri")).build();
+            mockedUtilities.when(() -> DatabricksUtil.createPostRequest(any(URI.class), any(JSONObject.class)))
+                    .thenReturn(mockRequest);
+
+            // Mock the HttpClient call
+            HttpClient mockClient = mock(HttpClient.class);
+            when(mockClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandlers.ofString().getClass())))
+                    .thenReturn(mockedResponse);
+
+            // Mock the getHttpClient static method from DatabricksUtil
+            mockedUtilities.when(() -> DatabricksUtil.getHttpClient(false)).thenReturn(mockClient);
+
+            // Act
+            BlobStorageTriggerFunction function = new BlobStorageTriggerFunction();
+            String result = function.triggerDBJob(params, messageJson);
+
+            // Assert
+            assertEquals("12345", result, "The run_id should be returned correctly");
+
+            // Verify that the static methods were called
+            mockedUtilities.verify(() -> DatabricksUtil.createPostRequest(any(URI.class), any(JSONObject.class)), times(1));
+            mockedUtilities.verify(() -> DatabricksUtil.getHttpClient(false), times(1));
+            Mockito.verify(mockClient).send(any(HttpRequest.class), any(HttpResponse.BodyHandlers.ofString().getClass()));
+        }
+    }
+}
+
