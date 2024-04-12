@@ -1,71 +1,61 @@
-import com.microsoft.azure.storage.CloudStorageAccount;
-import com.microsoft.azure.storage.blob.CloudBlobClient;
-import com.microsoft.azure.storage.blob.CloudBlobContainer;
-import com.microsoft.azure.storage.blob.CloudBlockBlob;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class BlobStorageTriggerFunctionTest {
+class BlobStorageTriggerFunctionTest {
 
     @Mock
     private ExecutionContext context;
     @Mock
-    private CloudBlobClient mockBlobClient;
+    private Logger logger;
     @Mock
-    private CloudBlobContainer mockBlobContainer;
+    private PGDbConnection dbConnection;
     @Mock
-    private CloudBlockBlob mockBlockBlob;
+    private Connection sqlConnection;
     @Mock
-    private Logger mockLogger;
+    private PreparedStatement preparedStatement;
+    @Mock
+    private ResultSet resultSet;
 
     private BlobStorageTriggerFunction function;
-    private final String connectionString = "DefaultEndpointsProtocol=https;AccountName=yourAccountName;AccountKey=yourAccountKey;EndpointSuffix=core.windows.net";
-    private final String containerName = "yourContainerName";
-    private final String blobName = "yourBlobName";
-    private final String subFolder = "yourSubFolder";
-    private final String fullFilePath = subFolder + "/" + blobName;
 
     @BeforeEach
     void setUp() {
         function = new BlobStorageTriggerFunction();
-        when(context.getLogger()).thenReturn(mockLogger);
-
-        // Set system properties for your environment variables.
-        // This is for the purpose of the test and should match your actual environment setup.
-        System.setProperty("AZURE_STORAGE_CONTAINER", containerName);
-        System.setProperty("Azure_STORAGE_SUBFOLDER", subFolder);
-
-        // Mocking CloudStorageAccount.parse to return a mock CloudStorageAccount object
-        try (MockedStatic<CloudStorageAccount> cloudStorageAccountMockedStatic = mockStatic(CloudStorageAccount.class)) {
-            CloudStorageAccount mockCloudStorageAccount = mock(CloudStorageAccount.class);
-            when(mockCloudStorageAccount.createCloudBlobClient()).thenReturn(mockBlobClient);
-            when(mockBlobClient.getContainerReference(anyString())).thenReturn(mockBlobContainer);
-            when(mockBlobContainer.getBlockBlobReference(anyString())).thenReturn(mockBlockBlob);
-
-            cloudStorageAccountMockedStatic.when(() -> CloudStorageAccount.parse(connectionString))
-                                           .thenReturn(mockCloudStorageAccount);
-        }
+        when(context.getLogger()).thenReturn(logger);
+        when(dbConnection.getConnection()).thenReturn(sqlConnection);
+        when(sqlConnection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
     }
 
     @Test
-    void testBlobTriggerInvocation() {
+    void testDatabaseQueryExecution() throws Exception {
         // Arrange
-        String blobContent = "This is a test blob content.";
-        String expectedLogMessage = "Constructed Blob URL: https://yourAccountName.blob.core.windows.net/yourContainerName/yourSubFolder/yourBlobName";
+        String blobName = "test-blob.txt";
+        String expectedSQL = "SELECT * FROM metadata WHERE blob_name = ?;";
+        
+        // Assuming that resultSet has methods that return metadata that you'd expect.
+        when(resultSet.next()).thenReturn(true); // Mock resultSet having at least one result.
+        when(resultSet.getString("last_modified_date")).thenReturn("2024-04-11T10:15:30Z");
+        when(resultSet.getString("other_metadata")).thenReturn("sample_metadata");
 
         // Act
-        function.run(blobContent, blobName, context);
+        function.run("<BLOB CONTENTS>", blobName, context);
 
         // Assert
-        verify(context).getLogger();
-        verify(mockLogger).info(contains(expectedLogMessage));
-        assertDoesNotThrow(() -> function.run(blobContent, blobName, context));
+        verify(preparedStatement).setString(1, blobName); // Confirm the correct blob name was set in the query.
+        verify(preparedStatement).executeQuery(); // Confirm the query was executed.
+        verify(logger).info(contains("Last modified date: 2024-04-11T10:15:30Z"));
+        verify(logger).info(contains("Other metadata: sample_metadata"));
+        
+        // Additional assertions could be added depending on what your function does with the data.
     }
 }
