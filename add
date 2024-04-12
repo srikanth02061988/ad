@@ -1,61 +1,25 @@
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+public class StorageConnectionStringTest {
 
-import static org.mockito.Mockito.*;
-
-@ExtendWith(MockitoExtension.class)
-class BlobStorageTriggerFunctionTest {
-
-    @Mock
-    private ExecutionContext context;
-    @Mock
-    private Logger logger;
-    @Mock
-    private PGDbConnection dbConnection;
-    @Mock
-    private Connection sqlConnection;
-    @Mock
-    private PreparedStatement preparedStatement;
-    @Mock
-    private ResultSet resultSet;
-
-    private BlobStorageTriggerFunction function;
-
-    @BeforeEach
-    void setUp() {
-        function = new BlobStorageTriggerFunction();
-        when(context.getLogger()).thenReturn(logger);
-        when(dbConnection.getConnection()).thenReturn(sqlConnection);
-        when(sqlConnection.prepareStatement(anyString())).thenReturn(preparedStatement);
-        when(preparedStatement.executeQuery()).thenReturn(resultSet);
-    }
-
-    @Test
-    void testDatabaseQueryExecution() throws Exception {
-        // Arrange
-        String blobName = "test-blob.txt";
-        String expectedSQL = "SELECT * FROM metadata WHERE blob_name = ?;";
-        
-        // Assuming that resultSet has methods that return metadata that you'd expect.
-        when(resultSet.next()).thenReturn(true); // Mock resultSet having at least one result.
-        when(resultSet.getString("last_modified_date")).thenReturn("2024-04-11T10:15:30Z");
-        when(resultSet.getString("other_metadata")).thenReturn("sample_metadata");
-
-        // Act
-        function.run("<BLOB CONTENTS>", blobName, context);
-
-        // Assert
-        verify(preparedStatement).setString(1, blobName); // Confirm the correct blob name was set in the query.
-        verify(preparedStatement).executeQuery(); // Confirm the query was executed.
-        verify(logger).info(contains("Last modified date: 2024-04-11T10:15:30Z"));
-        verify(logger).info(contains("Other metadata: sample_metadata"));
-        
-        // Additional assertions could be added depending on what your function does with the data.
+    public static void main(String[] args) {
+        try {
+            String connectionString = System.getenv("AZURE_STORAGE_CONNECTION_STRING");
+            if (connectionString == null || connectionString.trim().isEmpty()) {
+                throw new IllegalArgumentException("Connection string is not set or empty");
+            }
+            
+            // Parse the connection string and create a blob client.
+            CloudStorageAccount storageAccount = CloudStorageAccount.parse(connectionString.trim());
+            CloudBlobClient blobClient = storageAccount.createCloudBlobClient();
+            
+            // Optionally, list containers to verify the connection works
+            for (CloudBlobContainer container : blobClient.listContainers()) {
+                System.out.println("Container name: " + container.getName());
+            }
+            
+            System.out.println("Connection test succeeded.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Connection test failed.");
+        }
     }
 }
