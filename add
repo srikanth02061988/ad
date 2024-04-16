@@ -1,1 +1,65 @@
+import com.azure.identity.ManagedIdentityCredential;
+import com.azure.identity.ManagedIdentityCredentialBuilder;
+import com.azure.core.credential.TokenRequestContext;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+
+public class PGDbConnection {
+    private String connectionString;
+
+    public PGDbConnection(String connectionString) {
+        this.connectionString = connectionString;
+    }
+
+    public String getManagedIdentityToken(String managedClientId) throws Exception {
+        // Log that you're attempting to get the access token
+        System.out.println("Getting the Access Token");
+
+        // Create a new ManagedIdentityCredential using the client ID
+        ManagedIdentityCredential managedIdentityCredential = new ManagedIdentityCredentialBuilder()
+                .clientId(managedClientId)
+                .build();
+
+        // Request the access token
+        String accessToken = managedIdentityCredential
+                .getToken(new TokenRequestContext().addScopes(System.getenv("AZURE_DB_RESOURCE"))).block().getToken();
+
+        // Log the acquired token
+        System.out.println("Access Token: " + accessToken);
+
+        return accessToken;
+    }
+
+    public Connection getConnection() throws SQLException {
+        // Use the token to create a connection
+        String accessToken;
+        try {
+            accessToken = getManagedIdentityToken(System.getenv("POSTGRES_MI_CLIENT_ID"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Failed to get Access Token!");
+            throw new SQLException("Unable to get access token", e);
+        }
+
+        // Get other connection properties
+        String host = System.getenv("POSTGRES_HOST");
+        String port = System.getenv("POSTGRES_PORT");
+        String db = System.getenv("POSTGRES_DB");
+
+        // Construct the JDBC URL
+        String jdbcUrl = "jdbc:postgresql://" + host + ":" + port + "/" + db;
+
+        // Create a new DriverManagerDataSource and set the connection properties
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setUrl(jdbcUrl);
+        dataSource.setUsername(System.getenv("PG_MI_NAME")); // Ensure you have this environment variable
+        dataSource.setPassword(accessToken);
+        dataSource.setDriverClassName("org.postgresql.Driver");
+
+        // Return a connection from the data source
+        return dataSource.getConnection();
+    }
+}
 
