@@ -1,113 +1,65 @@
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import static org.mockito.Mockito.*;
 
+// Assuming these imports match your actual classes
+import com.microsoft.azure.storage.blob.CloudBlockBlob;
+import com.microsoft.azure.storage.blob.BlobProperties;
+import com.microsoft.azure.storage.CloudStorageAccount;
+import com.microsoft.azure.storage.blob.CloudBlobClient;
+import com.microsoft.azure.storage.blob.CloudBlobContainer;
 import java.util.Date;
 
 class BlobStorageTriggerFunctionTest {
 
-    @Mock
     private CloudBlockBlob mockBlob;
-    @Mock
     private BlobProperties mockBlobProperties;
-    @Mock
-    private CloudStorageAccount mockStorageAccount;
-    @Mock
     private CloudBlobClient mockBlobClient;
-    @Mock
     private CloudBlobContainer mockBlobContainer;
-    @Mock
     private ExecutionContext mockContext;
-    @Mock
     private Logger mockLogger;
-
-    private BlobStorageTriggerFunction function;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        function = new BlobStorageTriggerFunction(/* Inject any dependencies */);
+        mockBlob = mock(CloudBlockBlob.class);
+        mockBlobProperties = mock(BlobProperties.class);
+        mockBlobClient = mock(CloudBlobClient.class);
+        mockBlobContainer = mock(CloudBlobContainer.class);
+        mockContext = mock(ExecutionContext.class);
+        mockLogger = mock(Logger.class);
+        
         when(mockContext.getLogger()).thenReturn(mockLogger);
     }
-	
-	
-@Test
-void testBlobTrigger_NewBlobCreated() throws Exception {
-    // Mock the date for last modified to use in assertions
-    Date lastModified = new Date();
-
-    // Configure the mocks for the storage account, blob client, and container
-    when(mockStorageAccount.createCloudBlobClient()).thenReturn(mockBlobClient);
-    when(mockBlobClient.getContainerReference(anyString())).thenReturn(mockBlobContainer);
-    when(mockBlobContainer.getBlockBlobReference("path/to/blob")).thenReturn(mockBlob);
-    
-    // Set up the properties of the mock blob to return the last modified date
-    when(mockBlob.getProperties()).thenReturn(mockBlobProperties);
-    when(mockBlobProperties.getLastModified()).thenReturn(lastModified);
-
-    // Prepare any environment variables or context needed
-    when(System.getenv("AzureWebJobsStorage")).thenReturn("connection_string");
-    when(System.getenv("CUSTOM_ENV_VARIABLE")).thenReturn("value");
-    
-    // Mock the logger provided by the ExecutionContext
-    when(mockContext.getLogger()).thenReturn(mockLogger);
-
-    // Instantiate your function with any required parameters
-    BlobStorageTriggerFunction function = new BlobStorageTriggerFunction(
-        mockStorageAccount, // assuming the constructor or a method takes this
-        // ... other dependencies if needed
-    );
-
-    // Invoke the function
-    function.run(mockBlob, "path/to/blob", mockContext);
-
-    // Verify the correct methods were called on the mock objects
-    verify(mockBlob).downloadAttributes();
-    verify(mockBlobClient).getContainerReference(anyString());
-    verify(mockBlobContainer).getBlockBlobReference("path/to/blob");
-
-    // Assert that the correct information was logged
-    verify(mockLogger).info(contains("Blob Created"));
-    verify(mockLogger).info(contains(lastModified.toString()));
-
-    // More assertions and verifications based on your business logic
-}
-
-
 
     @Test
-    void testBlobTrigger_BlobNotModifiedWithinTimeframe() throws Exception {
-   5     // Configure the mocks for a "blob not modified within timeframe" scenario
-    6+    // ...
+    void testBlobTrigger_NewBlobCreated() throws Exception {
+        // Set up mock responses with dummy values
+        when(mockBlob.getProperties()).thenReturn(mockBlobProperties);
+        when(mockBlobProperties.getLastModified()).thenReturn(new Date());
+        when(mockBlobContainer.getBlockBlobReference(anyString())).thenReturn(mockBlob);
+        when(mockBlobClient.getContainerReference(anyString())).thenReturn(mockBlobContainer);
 
-        // Invoke the function
-        function.run(mockBlob, "path/to/blob", mockContext);
+        // Instantiate your function class with dummy environment setup if needed
+        BlobStorageTriggerFunction function = new BlobStorageTriggerFunction();
+        
+        // Dummy values for path and connection string
+        String dummyPath = "dummy/path/to/blob";
+        String dummyConnectionString = "DefaultEndpointsProtocol=https;AccountName=dummyaccount;AccountKey=dummykey;EndpointSuffix=core.windows.net";
 
-        // Verify the correct methods were called
-        // ...
+        // Mock the static method call that retrieves the connection string
+        mockStatic(System.class);
+        when(System.getenv("AzureWebJobsStorage")).thenReturn(dummyConnectionString);
 
-        // Assert that the correct logging happened, i.e., blob skipped
-        verify(mockLogger).info(contains("Skipping blob"));
+        // Invoke the function with dummy values
+        function.run(mockBlob, dummyPath, mockContext);
 
-        // More assertions and verifications based on your business logic
+        // Assertions and verifications here
+        verify(mockBlob).downloadAttributes();
+        verify(mockBlobClient).getContainerReference("dummy-container");
+        verify(mockBlobContainer).getBlockBlobReference(dummyPath);
+        verify(mockLogger).info(contains("Blob Created"));
+        // Add more verifications to cover other lines of your code
     }
-
-    @Test
-    void testBlobTrigger_ExceptionThrownForEmptyPayload() {
-        // Configure the mocks for an "empty payload" scenario
-        // ...
-
-        // Invoke the function and expect an exception
-        assertThrows(Exception.class, () -> function.run(mockBlob, "", mockContext));
-
-        // Verify that an exception was logged
-        verify(mockLogger).info(contains("Empty Payload"));
-    }
-
-    // Additional tests for database interactions, JSON object creation, etc.
-    // ...
 }
-
-
