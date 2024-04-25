@@ -1,65 +1,113 @@
-import com.azure.identity.ManagedIdentityCredential;
-import com.azure.identity.ManagedIdentityCredentialBuilder;
-import com.azure.core.credential.TokenRequestContext;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import static org.mockito.Mockito.*;
 
-public class PGDbConnection {
-    private String connectionString;
+import java.util.Date;
 
-    public PGDbConnection(String connectionString) {
-        this.connectionString = connectionString;
+class BlobStorageTriggerFunctionTest {
+
+    @Mock
+    private CloudBlockBlob mockBlob;
+    @Mock
+    private BlobProperties mockBlobProperties;
+    @Mock
+    private CloudStorageAccount mockStorageAccount;
+    @Mock
+    private CloudBlobClient mockBlobClient;
+    @Mock
+    private CloudBlobContainer mockBlobContainer;
+    @Mock
+    private ExecutionContext mockContext;
+    @Mock
+    private Logger mockLogger;
+
+    private BlobStorageTriggerFunction function;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        function = new BlobStorageTriggerFunction(/* Inject any dependencies */);
+        when(mockContext.getLogger()).thenReturn(mockLogger);
     }
+	
+	
+@Test
+void testBlobTrigger_NewBlobCreated() throws Exception {
+    // Mock the date for last modified to use in assertions
+    Date lastModified = new Date();
 
-    public String getManagedIdentityToken(String managedClientId) throws Exception {
-        // Log that you're attempting to get the access token
-        System.out.println("Getting the Access Token");
+    // Configure the mocks for the storage account, blob client, and container
+    when(mockStorageAccount.createCloudBlobClient()).thenReturn(mockBlobClient);
+    when(mockBlobClient.getContainerReference(anyString())).thenReturn(mockBlobContainer);
+    when(mockBlobContainer.getBlockBlobReference("path/to/blob")).thenReturn(mockBlob);
+    
+    // Set up the properties of the mock blob to return the last modified date
+    when(mockBlob.getProperties()).thenReturn(mockBlobProperties);
+    when(mockBlobProperties.getLastModified()).thenReturn(lastModified);
 
-        // Create a new ManagedIdentityCredential using the client ID
-        ManagedIdentityCredential managedIdentityCredential = new ManagedIdentityCredentialBuilder()
-                .clientId(managedClientId)
-                .build();
+    // Prepare any environment variables or context needed
+    when(System.getenv("AzureWebJobsStorage")).thenReturn("connection_string");
+    when(System.getenv("CUSTOM_ENV_VARIABLE")).thenReturn("value");
+    
+    // Mock the logger provided by the ExecutionContext
+    when(mockContext.getLogger()).thenReturn(mockLogger);
 
-        // Request the access token
-        String accessToken = managedIdentityCredential
-                .getToken(new TokenRequestContext().addScopes(System.getenv("AZURE_DB_RESOURCE"))).block().getToken();
+    // Instantiate your function with any required parameters
+    BlobStorageTriggerFunction function = new BlobStorageTriggerFunction(
+        mockStorageAccount, // assuming the constructor or a method takes this
+        // ... other dependencies if needed
+    );
 
-        // Log the acquired token
-        System.out.println("Access Token: " + accessToken);
+    // Invoke the function
+    function.run(mockBlob, "path/to/blob", mockContext);
 
-        return accessToken;
-    }
+    // Verify the correct methods were called on the mock objects
+    verify(mockBlob).downloadAttributes();
+    verify(mockBlobClient).getContainerReference(anyString());
+    verify(mockBlobContainer).getBlockBlobReference("path/to/blob");
 
-    public Connection getConnection() throws SQLException {
-        // Use the token to create a connection
-        String accessToken;
-        try {
-            accessToken = getManagedIdentityToken(System.getenv("POSTGRES_MI_CLIENT_ID"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("Failed to get Access Token!");
-            throw new SQLException("Unable to get access token", e);
-        }
+    // Assert that the correct information was logged
+    verify(mockLogger).info(contains("Blob Created"));
+    verify(mockLogger).info(contains(lastModified.toString()));
 
-        // Get other connection properties
-        String host = System.getenv("POSTGRES_HOST");
-        String port = System.getenv("POSTGRES_PORT");
-        String db = System.getenv("POSTGRES_DB");
-
-        // Construct the JDBC URL
-        String jdbcUrl = "jdbc:postgresql://" + host + ":" + port + "/" + db;
-
-        // Create a new DriverManagerDataSource and set the connection properties
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setUrl(jdbcUrl);
-        dataSource.setUsername(System.getenv("PG_MI_NAME")); // Ensure you have this environment variable
-        dataSource.setPassword(accessToken);
-        dataSource.setDriverClassName("org.postgresql.Driver");
-
-        // Return a connection from the data source
-        return dataSource.getConnection();
-    }
+    // More assertions and verifications based on your business logic
 }
+
+
+
+    @Test
+    void testBlobTrigger_BlobNotModifiedWithinTimeframe() throws Exception {
+   5     // Configure the mocks for a "blob not modified within timeframe" scenario
+    6+    // ...
+
+        // Invoke the function
+        function.run(mockBlob, "path/to/blob", mockContext);
+
+        // Verify the correct methods were called
+        // ...
+
+        // Assert that the correct logging happened, i.e., blob skipped
+        verify(mockLogger).info(contains("Skipping blob"));
+
+        // More assertions and verifications based on your business logic
+    }
+
+    @Test
+    void testBlobTrigger_ExceptionThrownForEmptyPayload() {
+        // Configure the mocks for an "empty payload" scenario
+        // ...
+
+        // Invoke the function and expect an exception
+        assertThrows(Exception.class, () -> function.run(mockBlob, "", mockContext));
+
+        // Verify that an exception was logged
+        verify(mockLogger).info(contains("Empty Payload"));
+    }
+
+    // Additional tests for database interactions, JSON object creation, etc.
+    // ...
+}
+
 
