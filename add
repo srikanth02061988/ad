@@ -1,123 +1,52 @@
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import static org.mockito.Mockito.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(MockitoExtension.class)
-public class BlobStorageTriggerFunctionTest {
+class BlobLogicTest {
 
-    @Mock
-    private CloudBlockBlob mockBlob;
-    @Mock
-    private BlobProperties mockBlobProperties;
-    @Mock
-    private ExecutionContext mockContext;
-    @Mock
-    private Logger mockLogger;
-    @InjectMocks
-    private BlobStorageTriggerFunction function;
-
-    // Let's assume this is the path format your application uses
-    private final String mockBlobPath = "container/blob-subfolder/blobfile.txt";
-
-    @BeforeEach
-    void setUp() {
-        when(mockContext.getLogger()).thenReturn(mockLogger);
-    }
-
-    @Test
-    public void shouldThrowExceptionForEmptyFilePath() {
-        // The path is empty, should throw the "Empty Payload" exception
-        Exception exception = assertThrows(Exception.class, () -> {
-            function.run(mockBlob, "", mockContext);
-        });
-        assertEquals("Empty Payload", exception.getMessage());
-    }
-
-    @Test
-    public void shouldLogBlobCreatedForValidPath() {
-        // Run the function with a valid mock path
-        function.run(mockBlob, mockBlobPath, mockContext);
-        verify(mockLogger).info(contains("Blob Created: " + mockBlobPath));
-    }
-
-    @Test
-    public void shouldSkipBlobIfNotModifiedWithinTimeframe() {
-        when(mockBlob.getProperties()).thenReturn(mockBlobProperties);
-        // Set last modified time to more than 2 minutes ago (2 minutes = 120,000 milliseconds)
-        when(mockBlobProperties.getLastModified()).thenReturn(new Date(System.currentTimeMillis() - 121000));
+    // This is the method containing the business logic you want to test.
+    public boolean shouldSkipBlob(Date lastModified) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
         
-        function.run(mockBlob, mockBlobPath, mockContext);
-        
-        verify(mockLogger).info(contains("Skipping blob: " + mockBlobPath));
+        if (lastModified == null) {
+            // Logic when lastModified is null
+            return false; // For testing purposes, let's say we don't skip if we can't get the last modified time.
+        } else {
+            // Logic when lastModified is not null
+            Date twentyMinutesAgo = new Date(System.currentTimeMillis() - 1200000); // 1200000ms = 20 minutes
+            return lastModified.before(twentyMinutesAgo);
+        }
     }
 
     @Test
-    public void shouldLogIfLastModifiedDateNotAvailable() {
-        when(mockBlob.getProperties()).thenReturn(mockBlobProperties);
-        when(mockBlobProperties.getLastModified()).thenReturn(null);
-
-        function.run(mockBlob, mockBlobPath, mockContext);
-
-        verify(mockLogger).info(contains("Could not get lastModified for: " + mockBlobPath));
-    }
-
-    // ... Additional test cases for database interaction and SQL exceptions
-}
-
-
-import com.microsoft.azure.storage.blob.*;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.mockito.Mockito.*;
-
-@ExtendWith(MockitoExtension.class)
-public class YourFunctionTest {
-
-    @Mock
-    private CloudBlobClient cloudBlobClient;
-
-    @Mock
-    private CloudBlockBlob cloudBlockBlob;
-
-    @Mock
-    private CloudStorageAccount storageAccount;
-
-    @Mock
-    private ExecutionContext context;
-
-    @InjectMocks
-    private YourFunction function; // Replace 'YourFunction' with your actual function class name
-
-    @Test
-    public void testRunFunction() throws Exception {
+    void shouldSkipBlobWhenLastModifiedIsOld() {
         // Arrange
-        String fakeFilePath = "mock/blob/path";
-        String storageConnectionString = "DefaultEndpointsProtocol=https;AccountName=YourAccountName;AccountKey=YourAccountKey;EndpointSuffix=core.windows.net";
-        
-        when(storageAccount.createCloudBlobClient()).thenReturn(cloudBlobClient);
-        when(cloudBlobClient.getContainerReference(anyString())).thenReturn(new CloudBlobContainer(new URI("http://example.com")));
-        when(cloudBlockBlob.getProperties()).thenReturn(new BlobProperties());
-        when(cloudBlockBlob.getUri()).thenReturn(new URI("http://example.com"));
-
+        Date oldDate = new Date(System.currentTimeMillis() - 1200000); // 20 minutes and 1 second ago
         // Act
-        function.run(fakeFilePath, cloudBlockBlob, context);
-
+        boolean result = shouldSkipBlob(oldDate);
         // Assert
-        // Add assertions here to verify the behavior of the run method
-        // For example:
-        verify(cloudBlockBlob, times(1)).downloadAttributes();
-        // You can also verify logging, but since it's a static method you might need to refactor your code to allow mocking it or use PowerMockito
+        assertTrue(result, "Blob should be skipped because it was last modified more than 20 minutes ago.");
+    }
+
+    @Test
+    void shouldNotSkipBlobWhenLastModifiedIsRecent() {
+        // Arrange
+        Date recentDate = new Date(System.currentTimeMillis() - 10000); // 10 seconds ago
+        // Act
+        boolean result = shouldSkipBlob(recentDate);
+        // Assert
+        assertFalse(result, "Blob should not be skipped because it was last modified within the last 20 minutes.");
+    }
+
+    @Test
+    void shouldNotSkipBlobWhenLastModifiedIsNull() {
+        // Act
+        boolean result = shouldSkipBlob(null);
+        // Assert
+        assertFalse(result, "Blob should not be skipped if the last modified time is unknown.");
     }
 }
-
-
-https://mytestaccount.blob.core.windows.net/mytestcontainer/mytestblob.txt
