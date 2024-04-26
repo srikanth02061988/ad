@@ -68,3 +68,53 @@ public class BlobStorageTriggerFunctionTest {
 
     // ... Additional test cases for database interaction and SQL exceptions
 }
+
+
+import com.microsoft.azure.storage.blob.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class YourFunctionTest {
+
+    @Mock
+    private CloudBlobClient cloudBlobClient;
+
+    @Mock
+    private CloudBlockBlob cloudBlockBlob;
+
+    @Mock
+    private CloudStorageAccount storageAccount;
+
+    @Mock
+    private ExecutionContext context;
+
+    @InjectMocks
+    private YourFunction function; // Replace 'YourFunction' with your actual function class name
+
+    @Test
+    public void testRunFunction() throws Exception {
+        // Arrange
+        String fakeFilePath = "mock/blob/path";
+        String storageConnectionString = "DefaultEndpointsProtocol=https;AccountName=YourAccountName;AccountKey=YourAccountKey;EndpointSuffix=core.windows.net";
+        
+        when(storageAccount.createCloudBlobClient()).thenReturn(cloudBlobClient);
+        when(cloudBlobClient.getContainerReference(anyString())).thenReturn(new CloudBlobContainer(new URI("http://example.com")));
+        when(cloudBlockBlob.getProperties()).thenReturn(new BlobProperties());
+        when(cloudBlockBlob.getUri()).thenReturn(new URI("http://example.com"));
+
+        // Act
+        function.run(fakeFilePath, cloudBlockBlob, context);
+
+        // Assert
+        // Add assertions here to verify the behavior of the run method
+        // For example:
+        verify(cloudBlockBlob, times(1)).downloadAttributes();
+        // You can also verify logging, but since it's a static method you might need to refactor your code to allow mocking it or use PowerMockito
+    }
+}
