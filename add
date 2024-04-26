@@ -53,104 +53,34 @@ class BlobLogicTest {
 
 
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import java.util.Date;
-
-class BlobStorageTriggerFunctionTest {
-    
-    // Mocks for required dependencies like blob client, logger, etc.
-    @Mock
-    private Logger logger;
-    
-    @Test
-    void whenBlobIsModifiedWithinTimeFrame_thenShouldProcess() {
-        // Arrange
-        String validFilePath = "path/to/blob";
-        Date recentModificationDate = new Date(System.currentTimeMillis() - 10 * 60000); // modified 10 minutes ago
-
-        // Assuming 'processBlob' is the method you want to test which contains the business logic
-        BlobStorageTriggerFunction function = new BlobStorageTriggerFunction(logger);
-
-        // Act
-        function.processBlob(validFilePath, recentModificationDate);
-
-        // Assert
-        // Verify that logger is not called with "Skipping blob" message
-        verify(logger, never()).info(contains("Skipping blob"));
-
-        // Other asserts to confirm the behavior like updating the database, logging other info, etc.
-    }
-
-    // Other test methods for different scenarios...
-}
-
-
 import com.microsoft.azure.storage.blob.CloudBlockBlob;
 import com.microsoft.azure.storage.blob.CloudBlobClient;
 import com.microsoft.azure.storage.CloudStorageAccount;
-import com.microsoft.azure.storage.blob.BlobProperties;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Date;
-
-import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class BlobStorageTriggerFunctionTest {
 
-    @Mock
-    private CloudStorageAccount mockStorageAccount;
-
-    @Mock
-    private CloudBlobClient mockBlobClient;
-
-    @Mock
-    private CloudBlockBlob mockBlockBlob;
-
-    @Mock
-    private BlobProperties mockBlobProperties;
-
-    @Mock
-    private ExecutionContext mockContext;
-
-    // This represents your Azure Function class that has the run method.
-    private YourFunctionClass function;
-
-    @BeforeEach
-    public void setUp() throws Exception {
-        // Initialize your function with mock dependencies as needed.
-        function = new YourFunctionClass();
-        
-        // Assume setup of your mocks here...
-        // You will need to stub the mockBlockBlob.downloadAttributes(), and any other methods called in the 'run' method.
-    }
-
     @Test
-    public void testRunBlobModifiedRecently() throws Exception {
+    public void whenFilePathIsEmpty_thenExceptionIsThrown() {
         // Arrange
-        String fakePath = "fake/blob/path";
-        when(mockBlockBlob.getProperties()).thenReturn(mockBlobProperties);
-        when(mockBlobProperties.getLastModified()).thenReturn(new Date(System.currentTimeMillis() - 10 * 60 * 1000)); // Blob modified 10 minutes ago
+        CloudBlockBlob mockBlockBlob = mock(CloudBlockBlob.class);
+        ExecutionContext mockContext = mock(ExecutionContext.class);
+        YourFunctionClass function = new YourFunctionClass();
         
-        // Act
-        function.run(fakePath, mockBlockBlob, mockContext);
-
-        // Assert
-        // Here we can assert that LOGGER.info was called with the expected messages
-        // You will need to use ArgumentCaptor or similar to capture logger calls if LOGGER is a static logger
-        // This is pseudo-code and would depend on your logger setup:
-        ArgumentCaptor<String> logArgumentCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockLogger, atLeastOnce()).info(logArgumentCaptor.capture());
-        assertFalse(logArgumentCaptor.getAllValues().contains("Skipping blob"));
+        // Act & Assert
+        Exception exception = assertThrows(Exception.class, () -> {
+            function.run("", mockBlockBlob, mockContext);
+        });
+        
+        // Here we can assert the exception message is as expected
+        assertEquals("Empty Payload", exception.getMessage());
     }
 
-    // Additional test methods for different scenarios can be written in a similar manner.
+    // ... Additional test cases
 }
