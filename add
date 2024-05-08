@@ -1,7 +1,57 @@
-Perplexity: A measure of how well the probability distribution predicted by the model matches the observed outcomes; higher perplexity may indicate more frequent hallucinations.
-Semantic Coherence: Evaluating whether the text is logically consistent and stays relevant throughout the discourse.
-Semantic Similarity: Determine how closely the language model's responses align with the context of the prompt. This metric is useful for understanding whether the LLM is maintaining thematic consistency with the provided information.
-Answer/Context Relevance: The importance of ensuring that the model not only generates factual and coherent responses but also that these responses are contextually appropriate to the user's initial query. This involves evaluating whether the AI’s output is directly answering the question asked or merely providing related but ultimately irrelevant information.
-Reference Corpus Comparison: Analyzing the overlap between AI-generated text and a trusted corpus helps identify deviations that could signal hallucinations.
-Monitoring Changes: Monitoring how well the LLM adapts to changes in the context or environment it operates in is also important. For instance, if new topics or concerns arise that were not part of the original training data, the LLM might struggle to provide relevant answers. Prompt injection attacks or unexpected user interactions can reveal these limitations.
-Prompt and Response Alignment: Both the retrieval mechanism (how information is pulled from the database or corpus) and the generative model (how the response is crafted) must work harmoniously to ensure that responses are not only accurate but also relevant to the specific context of the query.
+import json
+from pyspark.sql import SparkSession
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
+import torch
+from sentence_transformers import SentenceTransformer
+from scipy.spatial.distance import cosine
+
+# Initialize sentence transformer model for semantic similarity
+sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+
+# Path to your JSON file in DBFS
+json_path = "/dbfs/mnt/path_to_your_json_file.json"
+
+# Read the JSON file
+with open(json_path, 'r') as file:
+    data = json.load(file)
+
+# Extract the input prompt and the LLM response
+input_prompt = data['input']['input_prompt'][0]['content']
+llm_response = data['output'][0]['llm_response'][0]['text']
+
+
+# Load GPT-2 model and tokenizer
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+model = GPT2LMHeadModel.from_pretrained('gpt2')
+
+def calculate_perplexity(text):
+    tokenize_input = tokenizer.encode(text, return_tensors="pt")
+    loss = model(tokenize_input, labels=tokenize_input).loss
+    return torch.exp(loss).item()
+
+perplexity = calculate_perplexity(llm_response)
+
+
+def calculate_similarity(text1, text2):
+    embedding1 = sentence_model.encode(text1)
+    embedding2 = sentence_model.encode(text2)
+    return 1 - cosine(embedding1, embedding2)
+
+similarity = calculate_similarity(input_prompt, llm_response)
+
+
+def evaluate_confidence(perplexity, similarity):
+    # Assign weights based on your preference
+    weight_perplexity = 0.5  # Example weight
+    weight_similarity = 0.5  # Example weight
+
+    # Normalize perplexity (assuming lower is better)
+    normalized_perplexity = 1 / perplexity
+
+    # Calculate combined score
+    confidence_score = (normalized_perplexity * weight_perplexity +
+                        similarity * weight_similarity)
+    return confidence_score
+
+confidence_score = evaluate_confidence(perplexity, similarity)
