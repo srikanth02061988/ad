@@ -55,3 +55,22 @@ def evaluate_confidence(perplexity, similarity):
     return confidence_score
 
 confidence_score = evaluate_confidence(perplexity, similarity)
+
+
+
+
+# Extracting the input prompt and the LLM response
+input_prompt = data['input'][0]['input_prompt'][0]['content']
+# Parse the "11m_response" string into a JSON array and access the text
+# Extracting "11m_response" as a string
+llm_response_str = data['output'][0]['11m_response']
+# print("llm_response_str", llm_response_str)
+# Handling JSON parsing errors try:
+    llm_response_json = json.loads(llm_response_str)     llm_response = llm_response_json[0]['choices'][0]['text'] except json.JSONDecodeError:
+    llm_response = "Error: Invalid JSON format in '11m_response'"
+    
+print("Input Prompt:", input_prompt) print("LLM Response:", llm_response)
+
+
+
+
