@@ -73,4 +73,33 @@ print("Input Prompt:", input_prompt) print("LLM Response:", llm_response)
 
 
 
+import json
+
+json_path = ""
+
+try:
+    with open(json_path, 'r') as file:
+        data = json.load(file)
+        
+    input_prompt = data['input'][0]['input_prompt'][0]['content']
+    
+    llm_response_str = data['output'][0]['11m_response']
+    
+    try:
+        llm_response_json = json.loads(llm_response_str)
+        llm_response = llm_response_json[0]['choices'][0]['text']
+    except json.JSONDecodeError:
+        llm_response = "Error: Invalid JSON format in '11m_response'"
+    
+    print("Input Prompt:", input_prompt)
+    print("LLM Response:", llm_response)
+
+except FileNotFoundError:
+    print("Error: The file was not found.")
+except json.JSONDecodeError:
+    print("Error: Invalid JSON format in the file.")
+except KeyError as e:
+    print(f"Error: Missing key in the JSON data - {e}")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
 
