@@ -1,105 +1,59 @@
-import json
-from pyspark.sql import SparkSession
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-import torch
-from sentence_transformers import SentenceTransformer
-from scipy.spatial.distance import cosine
-
-# Initialize sentence transformer model for semantic similarity
-sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
-
-
-# Path to your JSON file in DBFS
-json_path = "/dbfs/mnt/path_to_your_json_file.json"
-
-# Read the JSON file
-with open(json_path, 'r') as file:
-    data = json.load(file)
-
-# Extract the input prompt and the LLM response
-input_prompt = data['input']['input_prompt'][0]['content']
-llm_response = data['output'][0]['llm_response'][0]['text']
-
-
-# Load GPT-2 model and tokenizer
-tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-model = GPT2LMHeadModel.from_pretrained('gpt2')
-
-def calculate_perplexity(text):
-    tokenize_input = tokenizer.encode(text, return_tensors="pt")
-    loss = model(tokenize_input, labels=tokenize_input).loss
-    return torch.exp(loss).item()
-
-perplexity = calculate_perplexity(llm_response)
-
-
-def calculate_similarity(text1, text2):
-    embedding1 = sentence_model.encode(text1)
-    embedding2 = sentence_model.encode(text2)
-    return 1 - cosine(embedding1, embedding2)
-
-similarity = calculate_similarity(input_prompt, llm_response)
-
-
-def evaluate_confidence(perplexity, similarity):
-    # Assign weights based on your preference
-    weight_perplexity = 0.5  # Example weight
-    weight_similarity = 0.5  # Example weight
-
-    # Normalize perplexity (assuming lower is better)
-    normalized_perplexity = 1 / perplexity
-
-    # Calculate combined score
-    confidence_score = (normalized_perplexity * weight_perplexity +
-                        similarity * weight_similarity)
-    return confidence_score
-
-confidence_score = evaluate_confidence(perplexity, similarity)
-
-
-
-
-# Extracting the input prompt and the LLM response
-input_prompt = data['input'][0]['input_prompt'][0]['content']
-# Parse the "11m_response" string into a JSON array and access the text
-# Extracting "11m_response" as a string
-llm_response_str = data['output'][0]['11m_response']
-# print("llm_response_str", llm_response_str)
-# Handling JSON parsing errors try:
-    llm_response_json = json.loads(llm_response_str)     llm_response = llm_response_json[0]['choices'][0]['text'] except json.JSONDecodeError:
-    llm_response = "Error: Invalid JSON format in '11m_response'"
-    
-print("Input Prompt:", input_prompt) print("LLM Response:", llm_response)
-
-
-
+from faker import Faker
 import json
 
-json_path = ""
+# Initialize Faker instance
+fake = Faker()
 
-try:
-    with open(json_path, 'r') as file:
-        data = json.load(file)
-        
-    input_prompt = data['input'][0]['input_prompt'][0]['content']
-    
-    llm_response_str = data['output'][0]['11m_response']
-    
-    try:
-        llm_response_json = json.loads(llm_response_str)
-        llm_response = llm_response_json[0]['choices'][0]['text']
-    except json.JSONDecodeError:
-        llm_response = "Error: Invalid JSON format in '11m_response'"
-    
-    print("Input Prompt:", input_prompt)
-    print("LLM Response:", llm_response)
+# Function to generate synthetic data
+def generate_synthetic_data():
+    attribute = fake.random_element(elements=("input", "output", "modelLatency", "modelTokenCount", "jailbreakAttempt", "guardRailAttempt"))
 
-except FileNotFoundError:
-    print("Error: The file was not found.")
-except json.JSONDecodeError:
-    print("Error: Invalid JSON format in the file.")
-except KeyError as e:
-    print(f"Error: Missing key in the JSON data - {e}")
-except Exception as e:
-    print(f"An unexpected error occurred: {e}")
+    if attribute in ("input", "output"):
+        value = {
+            "endpoint": "complete",
+            "modelName": "openai.turbo3.6",
+            "prompt": fake.sentence(nb_words=6)
+        }
+    else:
+        value = fake.random_int(min=1, max=100)
 
+    if attribute in ("jailbreakAttempt", "guardRailAttempt"):
+        metaInfo = {
+            "modelName": "azure-openai.gpt-3-5-turbo",
+            "prompt": fake.sentence(nb_words=6)
+        }
+    else:
+        metaInfo = {
+            "modelName": "azure-openai.gpt-3-5-turbo"
+        }
+
+    trace = {
+        "traceId": fake.uuid4(),
+        "attribute": attribute,
+        "value": value,
+        "metaInfo": metaInfo
+    }
+
+    data = {
+        "traceTime": fake.date_time_this_year().isoformat() + "Z",
+        "traceTimeEpochNS": fake.unix_time() * 10**9,
+        "clientId": fake.uuid4(),
+        "userId": fake.bothify(text="??-####-???"),
+        "sessionId": fake.uuid4(),
+        "appCode": "TXT",
+        "specVersion": "1.0.0",
+        "traceType": fake.random_element(elements=("trace", "metric")),
+        "logMessage": "None" if fake.boolean() else fake.sentence(nb_words=5),
+        "trace": trace
+    }
+
+    return data
+
+# Generate synthetic data
+synthetic_data = [generate_synthetic_data() for _ in range(100)]  # Generate 100 records
+
+# Save to JSON file
+with open('/mnt/data/synthetic_data.json', 'w') as f:
+    json.dump(synthetic_data, f, indent=2)
+
+print("Synthetic data has been generated and saved to 'synthetic_data.json'")
