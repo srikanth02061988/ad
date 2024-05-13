@@ -6,15 +6,14 @@ import datetime
 
 fake = Faker()
 
-# Function to generate trace with attributes
-def generate_trace(attribute, traceId):
+def generate_trace(attribute, traceId, value=None):
     if attribute in ("input", "output"):
         value = {
             "endpoint": "complete",
             "modelName": "openai.turbo3.6",
             "prompt": fake.sentence(nb_words=6)
         }
-    else:
+    elif value is None:
         value = fake.random_int(min=1, max=100)
     
     metaInfo = {
@@ -33,13 +32,11 @@ def generate_trace(attribute, traceId):
     
     return trace
 
-# Function to generate a session with all traces
 def generate_session(clientId, userId):
     traceTime = datetime.datetime.utcnow().isoformat() + "Z"
     traceTimeEpochNS = int(fake.unix_time() * 10**9)
     sessionId = fake.uuid4()
     
-    # Common IDs and times for all traces in a session
     base_trace = {
         "traceTime": traceTime,
         "traceTimeEpochNS": traceTimeEpochNS,
@@ -51,28 +48,21 @@ def generate_session(clientId, userId):
         "logMessage": "None"
     }
     
-    # Generate traces in a logical sequence
     traceId = fake.uuid4()
     traces = []
     traces.append(generate_trace("input", traceId))
     
-    # Determine if there is a jailbreak or guardrail attempt
     jailbreakAttempt = random.choice([0, 1])
     guardRailAttempt = random.choice([0, 1])
     
-    # Add jailbreak and guardrail attempts if they occur
-    if jailbreakAttempt:
-        traces.append(generate_trace("jailbreakAttempt", traceId))
-    if guardRailAttempt:
-        traces.append(generate_trace("guardRailAttempt", traceId))
+    traces.append(generate_trace("jailbreakAttempt", traceId, jailbreakAttempt))
+    traces.append(generate_trace("guardRailAttempt", traceId, guardRailAttempt))
     
-    # Only generate output, modelLatency, and modelTokenCount if no jailbreak or guardrail
-    if not jailbreakAttempt and not guardRailAttempt:
+    if jailbreakAttempt == 0 and guardRailAttempt == 0:
         traces.append(generate_trace("output", traceId))
         traces.append(generate_trace("modelLatency", traceId))
         traces.append(generate_trace("modelTokenCount", traceId))
     
-    # Create the full session data by combining the common attributes with each trace
     session_data = []
     for trace in traces:
         session = base_trace.copy()
@@ -82,7 +72,6 @@ def generate_session(clientId, userId):
     
     return session_data
 
-# Function to generate multiple sessions
 def generate_multiple_sessions(num_sessions, reuse_clients=True):
     clients = {}
     synthetic_data = []
@@ -99,13 +88,10 @@ def generate_multiple_sessions(num_sessions, reuse_clients=True):
     
     return synthetic_data
 
-# Generate synthetic data covering all scenarios
-synthetic_data = generate_multiple_sessions(50, reuse_clients=True)
+synthetic_data = generate_multiple_sessions(20, reuse_clients=True)
 
-# Save to JSON file
 output_file_path = os.path.expanduser('~/synthetic_data.json')
 with open(output_file_path, 'w') as f:
     json.dump(synthetic_data, f, indent=2)
 
 print(f"Synthetic data has been generated and saved to '{output_file_path}'")
-
