@@ -1,1 +1,99 @@
+import os
+from faker import Faker
+import json
+import random
+import datetime
+
+fake = Faker()
+
+# Generate a list of 10 different dates between May 5, 2024, and May 15, 2024
+dates = [datetime.datetime(2024, 5, day) for day in range(5, 15)]
+
+def generate_trace(attribute, traceId, value=None):
+    if attribute in ("input", "output"):
+        value = {
+            "endpoint": "complete",
+            "modelName": "openai.turbo3.6",
+            "prompt": fake.sentence(nb_words=6)
+        }
+    elif value is None:
+        value = fake.random_int(min=1, max=100)
+    
+    metaInfo = {
+        "modelName": "azure-openai.gpt-3-5-turbo"
+    }
+    
+    if attribute in ("jailbreakAttempt", "guardRailAttempt"):
+        metaInfo["prompt"] = fake.sentence(nb_words=6)
+    
+    trace = {
+        "traceId": traceId,
+        "attribute": attribute,
+        "value": value,
+        "metaInfo": metaInfo
+    }
+    
+    return trace
+
+def generate_session(clientId, userId):
+    base_date = random.choice(dates)
+    random_time = datetime.timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59), seconds=random.randint(0, 59))
+    traceTime = (base_date + random_time).isoformat() + "Z"
+    traceTimeEpochNS = int((base_date + random_time).timestamp() * 10**9)
+    sessionId = fake.uuid4()
+    
+    base_trace = {
+        "traceTime": traceTime,
+        "traceTimeEpochNS": traceTimeEpochNS,
+        "clientId": clientId,
+        "userId": userId,
+        "sessionId": sessionId,
+        "appCode": "TXT",
+        "specVersion": "1.0.0",
+        "logMessage": "None"
+    }
+    
+    traceId = fake.uuid4()
+    traces = []
+    traces.append(generate_trace("input", traceId))
+    
+    jailbreakAttempt = random.choice([0, 1])
+    guardRailAttempt = random.choice([0, 1])
+    
+    traces.append(generate_trace("jailbreakAttempt", traceId, jailbreakAttempt))
+    traces.append(generate_trace("guardRailAttempt", traceId, guardRailAttempt))
+    
+    if jailbreakAttempt == 0 and guardRailAttempt == 0:
+        traces.append(generate_trace("output", traceId))
+        traces.append(generate_trace("modelLatency", traceId))
+    
+    traces.append(generate_trace("modelTokenCount", traceId))
+    
+    session_data = []
+    for trace in traces:
+        session = base_trace.copy()
+        session["traceType"] = "trace" if trace["attribute"] in ("input", "output") else "metric"
+        session["trace"] = trace
+        session_data.append(session)
+    
+    return session_data
+
+def generate_multiple_sessions(num_sessions, reuse_clients=False):
+    synthetic_data = []
+    
+    for _ in range(num_sessions):
+        clientId = fake.uuid4()
+        userId = fake.bothify(text="??-####-???")
+        
+        synthetic_data.extend(generate_session(clientId, userId))
+    
+    return synthetic_data
+
+synthetic_data = generate_multiple_sessions(20)
+
+output_file_path = os.path.expanduser('~/synthetic_data.json')
+with open(output_file_path, 'w') as f:
+    json.dump(synthetic_data, f, indent=2)
+
+print(f"Synthetic data has been generated and saved to '{output_file_path}'")
 
