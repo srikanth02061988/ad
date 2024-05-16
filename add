@@ -1,22 +1,22 @@
--- Query to aggregate token usage by sessionId and traceDate
-WITH token_usage AS (
+-- Query to aggregate model latency by sessionId, traceId, and traceDate
+WITH latency_data AS (
     SELECT 
         sessionId, 
+        trace.traceId,
         to_date(traceTime) as traceDate,
-        CAST(trace.value AS FLOAT) AS tokens
+        CAST(trace.value AS FLOAT) AS model_latency
     FROM 
         hive_metastore.default.rai_new_payload_v2
     WHERE 
         traceType = 'metric' 
-        AND trace.attribute = 'tokenCount'
+        AND trace.attribute = 'modelLatency'
 )
 SELECT 
     sessionId,
+    traceId,
     traceDate,
-    SUM(tokens) AS total_tokens
+    model_latency
 FROM 
-    token_usage
-GROUP BY 
-    sessionId, traceDate
+    latency_data
 ORDER BY 
-    traceDate, sessionId;
+    traceDate, sessionId, traceId;
