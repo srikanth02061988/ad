@@ -97,3 +97,12 @@ with open(output_file_path, 'w') as f:
 
 print(f"Synthetic data has been generated and saved to '{output_file_path}'")
 
+
+
+-- Create date range widgets
+CREATE WIDGET TEXT startDate DEFAULT "2024-05-01T00:00:00Z";
+CREATE WIDGET TEXT endDate DEFAULT "2024-05-31T23:59:59Z";
+
+-- Create other necessary widgets
+CREATE WIDGET TEXT sessionId DEFAULT "defaultSessionId";
+CREATE WIDGET TEXT userId DEFAULT "defaultUserId";
