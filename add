@@ -1,8 +1,7 @@
 -- Main SQL query with both jailbreakAttempt and guardrailAttempt, handling null values
 WITH attempts AS (
     SELECT 
-        sessionId, 
-        traceTime,
+        to_date(traceTime) as traceDate, 
         attribute,
         CAST(trace.value AS FLOAT) AS value
     FROM 
@@ -12,11 +11,12 @@ WITH attempts AS (
         AND (trace.attribute = 'jailbreakAttempt' OR trace.attribute = 'guardrailAttempt')
 )
 SELECT 
-    sessionId,
-    traceTime,
-    MAX(CASE WHEN attribute = 'jailbreakAttempt' THEN value ELSE 0 END) AS jailbreak,
-    MAX(CASE WHEN attribute = 'guardrailAttempt' THEN value ELSE 0 END) AS guardrail
+    traceDate,
+    attribute,
+    SUM(value) AS total_attempts
 FROM 
     attempts
 GROUP BY 
-    sessionId, traceTime;
+    traceDate, attribute
+ORDER BY 
+    traceDate, attribute;
