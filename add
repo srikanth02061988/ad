@@ -1,22 +1,22 @@
--- Main SQL query with both jailbreakAttempt and guardrailAttempt, handling null values
-WITH attempts AS (
+-- Query to aggregate token usage by sessionId and traceDate
+WITH token_usage AS (
     SELECT 
-        to_date(traceTime) as traceDate, 
-        attribute,
-        CAST(trace.value AS FLOAT) AS value
+        sessionId, 
+        to_date(traceTime) as traceDate,
+        CAST(trace.value AS FLOAT) AS tokens
     FROM 
         hive_metastore.default.rai_new_payload_v2
     WHERE 
         traceType = 'metric' 
-        AND (trace.attribute = 'jailbreakAttempt' OR trace.attribute = 'guardrailAttempt')
+        AND trace.attribute = 'tokenCount'
 )
 SELECT 
+    sessionId,
     traceDate,
-    attribute,
-    SUM(value) AS total_attempts
+    SUM(tokens) AS total_tokens
 FROM 
-    attempts
+    token_usage
 GROUP BY 
-    traceDate, attribute
+    sessionId, traceDate
 ORDER BY 
-    traceDate, attribute;
+    traceDate, sessionId;
