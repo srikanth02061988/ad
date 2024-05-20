@@ -6,10 +6,7 @@ import datetime
 
 fake = Faker()
 
-# Generate a list of 10 different dates between May 5, 2024, and May 15, 2024
 dates = [datetime.datetime(2024, 5, day) for day in range(5, 15)]
-
-# Define possible app codes and model names
 app_codes = ["ABC", "XYZ", "TXT"]
 model_names_value = ["openai.turbo3.6", "azure-openai.gpt-3-4-turbo", "azure-openai.gpt-4-turbo"]
 model_names_meta = ["azure-openai.gpt-3-5-turbo", "azure-openai.gpt-3-4-turbo", "azure-openai.gpt-4-turbo"]
@@ -102,4 +99,3 @@ with open(output_file_path, 'w') as f:
     json.dump(synthetic_data, f, indent=2)
 
 print(f"Synthetic data has been generated and saved to '{output_file_path}'")
-
