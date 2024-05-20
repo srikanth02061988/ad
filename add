@@ -20,9 +20,11 @@ df = spark.read.format("delta").load(delta_table_path)
 
 def extract_prompt(value):
     try:
-        parsed_value = json.loads(value)
-        return parsed_value.get("prompt", None)
-    except json.JSONDecodeError:
+        if isinstance(value, str):
+            parsed_value = json.loads(value)
+            return parsed_value.get("prompt", None)
+        return value.prompt if value else None
+    except (json.JSONDecodeError, AttributeError):
         return None
 
 def detect_open_domain_hallucination(input_text, completion, num_runs=5, threshold=0.5):
@@ -56,8 +58,8 @@ def detect_open_domain_hallucination(input_text, completion, num_runs=5, thresho
 results = []
 
 for row in df.collect():
-    input_value = row['value'] if row['attribute'] == 'input' else None
-    output_value = row['value'] if row['attribute'] == 'output' else None
+    input_value = row.input.value if hasattr(row, 'input') else None
+    output_value = row.output.value if hasattr(row, 'output') else None
     
     if input_value and output_value:
         input_prompt = extract_prompt(input_value)
