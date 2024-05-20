@@ -1,1 +1,43 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType
+
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName("DeltaTableExample") \
+    .getOrCreate()
+
+# Define the schema for the DataFrame
+schema = StructType([
+    StructField("sessionId", StringType(), True),
+    StructField("input", StringType(), True),
+    StructField("output", StringType(), True),
+    StructField("jailbreak", StringType(), True),
+    StructField("guardrail", StringType(), True)
+])
+
+# Read JSON File into DataFrame
+input_file_path = "dbfs:/tmp/synthetic_data.json"
+df = spark.read.schema(schema).json(input_file_path)
+
+# Show the DataFrame schema and a few rows
+df.printSchema()
+df.show(5)
+
+# Write DataFrame to Delta Table
+database_name = "default"  # Change this to your desired database
+table_name = "synthetic_data"
+
+# Create the Delta table
+delta_table_path = f"dbfs:/tmp/{table_name}"
+df.write.format("delta").mode("overwrite").save(delta_table_path)
+
+# Register the Delta table in the specified database
+spark.sql(f"""
+    CREATE TABLE {database_name}.{table_name}
+    USING DELTA
+    LOCATION '{delta_table_path}'
+""")
+
+# Verify the data using SQL
+spark.sql(f"SELECT * FROM {database_name}.{table_name}").show(5)
 
