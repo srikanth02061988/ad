@@ -1,1 +1,24 @@
+import os
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from dotenv import load_dotenv
+
+load_dotenv()
+genai_api_key = os.getenv("GOOGLE_API_KEY")
+
+def test_embeddings():
+    if not genai_api_key:
+        print("API key is missing.")
+        return
+    
+    embeddings = GoogleGenerativeAIEmbeddings(api_key=genai_api_key, model="models/embedding-001")
+    test_text = ["This is a test text."]
+    
+    try:
+        result = embeddings.embed_documents(test_text)
+        print("Embeddings generated successfully:", result)
+    except Exception as e:
+        print("Error generating embeddings:", e)
+
+if __name__ == "__main__":
+    test_embeddings()
 
