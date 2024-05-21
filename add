@@ -1,34 +1,146 @@
 import streamlit as st
-import openai
+from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
-from azure.identity import DefaultAzureCredential
+import openai
+import psycopg2
+from psycopg2.extras import execute_values
+import numpy as np
+from langchain.vectorstores import FAISS
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
 
-# Configure OpenAI with Azure endpoint and key
+# Set up Azure OpenAI credentials
 openai.api_type = "azure"
 openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
 openai.api_version = "2022-12-01"
 openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
-def get_openai_response(prompt):
-    response = openai.ChatCompletion.create(
-        engine="text-davinci-002",  # Update with your specific deployment name
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=100
+# Connect to PostgreSQL database
+conn = psycopg2.connect(
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT"),
+    database=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD")
+)
+
+# Create table if it doesn't exist
+def create_table():
+    with conn.cursor() as cur:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS website.embeddings (
+            id BIGSERIAL PRIMARY KEY,
+            category TEXT,
+            content TEXT,
+            embedding BYTEA
+        );
+        """)
+        conn.commit()
+
+create_table()
+
+def get_embeddings(text):
+    response = openai.Embedding.create(
+        input=text.replace("\n", " "),
+        engine="text-embedding-ada-002"  # Update with the correct engine name
     )
-    return response.choices[0].message['content'].strip()
+    embedding = response['data'][0]['embedding']
+    return embedding
+
+def get_pdf_text(pdf_docs):
+    text = ""
+    reader = PdfReader(pdf_docs)
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
+
+def get_text_chunks(text):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    chunks = text_splitter.split_text(text)
+    return chunks
+
+def store_embeddings_in_db(text_chunks, category):
+    embeddings = [get_embeddings(chunk) for chunk in text_chunks]
+    data_list = [(category, chunk, np.array(embedding).tobytes()) for chunk, embedding in zip(text_chunks, embeddings)]
+
+    with conn.cursor() as cur:
+        execute_values(cur, "INSERT INTO website.embeddings (category, content, embedding) VALUES %s", data_list)
+    conn.commit()
+
+def get_conversational_chain(platform):
+    if platform == "Twitter":
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context in a concise manner suitable for a Twitter post. Ensure the response does not exceed 280 characters. If the answer is not in provided context just say, "answer is not available in the context".
+        Context: \n{context}\n
+        Question: \n{question}\n
+        Answer:
+        """
+    elif platform == "LinkedIn":
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context in a professional manner suitable for a LinkedIn post. Ensure the response is within 1,300 to 2,000 characters. If the answer is not in provided context just say, "answer is not available in the context".
+        Context: \n{context}\n
+        Question: \n{question}\n
+        Answer:
+        """
+    else:
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context. If the answer is not in provided context just say, "answer is not available in the context".
+        Context: \n{context}\n
+        Question: \n{question}\n
+        Answer:
+        """
+
+    model = openai.Completion.create  # Using Azure OpenAI for completion
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    return chain
+
+def user_input(user_question, platform):
+    with conn.cursor() as cur:
+        cur.execute("SELECT content, embedding FROM website.embeddings WHERE category = %s", (platform,))
+        rows = cur.fetchall()
+    
+    # Converting the stored embeddings back to a format usable by FAISS
+    docs = [row[0] for row in rows]
+    embeddings = [np.frombuffer(row[1], dtype=np.float32) for row in rows]
+
+    # Rebuild FAISS index from the database
+    vector_store = FAISS.from_texts(docs, embeddings)
+    vector_store.save_local("faiss_index")
+
+    new_db = FAISS.load_local("faiss_index")
+    docs = new_db.similarity_search(user_question)
+    chain = get_conversational_chain(platform)
+    response = chain({'input_documents': docs, 'question': user_question}, return_only_outputs=True)
+    st.write("Reply: ", response["output_text"])
 
 def main():
-    st.title("Azure OpenAI with Streamlit")
+    st.set_page_config(page_title="Digital Marketing")
+    st.header("Generate Derivative Content")
+
+    st.sidebar.title("Menu:")
+    pdf_category = st.sidebar.selectbox(
+        "Select the category for the PDF:",
+        ("Twitter", "LinkedIn", "Other")
+    )
+    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files and Click on the submit and process", type=["pdf"])
+    if st.sidebar.button("Submit & Process"):
+        with st.spinner("Processing..."):
+            raw_text = get_pdf_text(pdf_docs)
+            textchunks = get_text_chunks(raw_text)
+            store_embeddings_in_db(textchunks, pdf_category)
+            st.sidebar.success("Done")
+
+    platform = st.selectbox(
+        "Select the platform for the output:",
+        ("Twitter", "LinkedIn", "Other")
+    )
     
-    user_input = st.text_input("Enter your prompt:")
+    user_question = st.text_input("Ask a Question from the PDF Files")
     
-    if st.button("Generate Response"):
-        with st.spinner("Generating response..."):
-            response = get_openai_response(user_input)
-            st.write("Response:", response)
+    if user_question:
+        user_input(user_question, platform)
 
 if __name__ == "__main__":
     main()
