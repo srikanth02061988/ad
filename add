@@ -1,24 +1,120 @@
 import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import numpy as np
+import streamlit as st
+from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.textanalytics import TextAnalyticsClient
+import faiss
 
+# Load environment variables
 load_dotenv()
-genai_api_key = os.getenv("GOOGLE_API_KEY")
+azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
+azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 
-def test_embeddings():
-    if not genai_api_key:
-        print("API key is missing.")
-        return
-    
-    embeddings = GoogleGenerativeAIEmbeddings(api_key=genai_api_key, model="models/embedding-001")
-    test_text = ["This is a test text."]
-    
+# Initialize Azure Text Analytics client
+credential = AzureKeyCredential(azure_openai_api_key)
+text_analytics_client = TextAnalyticsClient(endpoint=azure_openai_endpoint, credential=credential)
+
+def get_pdf_text(pdf_docs):
+    text = ""
+    reader = PdfReader(pdf_docs)
+    number_of_pages = len(reader.pages)
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
+
+def get_text_chunks(text):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    chunks = text_splitter.split_text(text)
+    return chunks
+
+def generate_embeddings(texts):
+    result = text_analytics_client.extract_key_phrases(documents=texts)
+    embeddings = []
+    for doc in result:
+        if not doc.is_error:
+            embeddings.append(np.array([hash(phrase) for phrase in doc.key_phrases]).astype('float32'))
+        else:
+            embeddings.append(np.zeros(1))  # handle error case with a zero vector
+    return embeddings
+
+def get_vector_store(text_chunks):
     try:
-        result = embeddings.embed_documents(test_text)
-        print("Embeddings generated successfully:", result)
+        embeddings = generate_embeddings(text_chunks)
+        dimension = len(embeddings[0])
+        index = faiss.IndexFlatL2(dimension)
+        index.add(np.array(embeddings))
+        faiss.write_index(index, "faiss_index")
+        return index
     except Exception as e:
         print("Error generating embeddings:", e)
+        st.error("Failed to generate embeddings. Please check your configuration and try again.")
+        return None
+
+def get_conversational_chain(platform):
+    if platform == "Twitter":
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context in a concise manner suitable for a Twitter post. Ensure the response does not exceed 280 characters. If the answer is not in provided context just say, "answer is not available in the context".
+        Context: \n{context}\n
+        Question: \n{question}\n
+        Answer:
+        """
+    elif platform == "LinkedIn":
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context in a professional manner suitable for a LinkedIn post. Ensure the response is within 1,300 to 2,000 characters. If the answer is not in provided context just say, "answer is not available in the context".
+        Context: \n{context}\n
+        Question: \n{question}\n
+        Answer:
+        """
+    else:
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context. If the answer is not in provided context just say, "answer is not available in the context".
+        Context: \n{context}\n
+        Question: \n{question}\n
+        Answer:
+        """
+    
+    # Placeholder for actual chain implementation using Azure OpenAI (adjust as needed)
+    # Example assumes a hypothetical function that takes the prompt_template and returns a QA chain
+    chain = create_azure_openai_chain(prompt_template)
+    return chain
+
+def user_input(user_question, platform):
+    index = faiss.read_index("faiss_index")
+    query_embedding = generate_embeddings([user_question])[0]
+    D, I = index.search(np.array([query_embedding]), k=5)
+    similar_docs = [text_chunks[i] for i in I[0]]
+    
+    chain = get_conversational_chain(platform)
+    response = chain({'input_documents': similar_docs, 'question': user_question}, return_only_outputs=True)
+    print(response)
+    st.write("Reply: ", response["output_text"])
+
+def main():
+    st.set_page_config("Digital Marketing")
+    st.header("Generate Derivative Content")
+    
+    platform = st.selectbox(
+        "Select the platform for the output:",
+        ("Twitter", "LinkedIn", "Other")
+    )
+    
+    user_question = st.text_input("Ask a Question from the PDF Files")
+    
+    if user_question:
+        user_input(user_question, platform)
+        
+    with st.sidebar:
+        st.title("Menu:")
+        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the submit and process")
+        if st.button("Submit & Process"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = get_text_chunks(raw_text)
+                get_vector_store(text_chunks)
+                st.success("Done")
 
 if __name__ == "__main__":
-    test_embeddings()
-
+    main()
