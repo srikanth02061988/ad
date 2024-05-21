@@ -1,81 +1,99 @@
-from pyspark.sql import SparkSession
-from delta import configure_spark_with_delta_pip
-from transformers import pipeline, set_seed
-import json
+import streamlit as st
+from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import os
+import constants
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from google.generativeai import genai
+from dotenv import load_dotenv
+from langchain.vectorstores import FAISS
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
+import asyncio
 
-# Configure Spark with Delta Lake
-builder = SparkSession.builder.appName("HallucinationDetection") \
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+asyncio.set_event_loop(asyncio.new_event_loop())
+load_dotenv()
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-spark = configure_spark_with_delta_pip(builder).getOrCreate()
+def get_pdf_text(pdf_docs):
+    text = ""
+    reader = PdfReader(pdf_docs)
+    number_of_pages = len(reader.pages)
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
 
-# Initialize the question-answering pipeline
-set_seed(42)
-qa_pipeline = pipeline('question-answering', model='distilbert-base-cased-distilled-squad')
+def get_text_chunks(text):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    chunks = text_splitter.split_text(text)
+    return chunks
 
-# Load data from Delta Table
-delta_table_path = "path_to_your_delta_table"
-df = spark.read.format("delta").load(delta_table_path)
+def get_vector_store(text_chunks):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
+    vector_store.save_local("faiss_index")
+    return vector_store
 
-def extract_prompt(value):
-    try:
-        if isinstance(value, str):
-            parsed_value = json.loads(value)
-            return parsed_value.get("prompt", None)
-        return value.prompt if value else None
-    except (json.JSONDecodeError, AttributeError):
-        return None
+def get_conversational_chain(platform):
+    if platform == "Twitter":
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context in a concise manner suitable for a Twitter post.
+        Context: \n {context}?\n
+        Question: \n{question}\n
+        Answer:
+        """
+    elif platform == "LinkedIn":
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context in a professional manner suitable for a LinkedIn post.
+        Context: \n {context}?\n
+        Question: \n{question}\n
+        Answer:
+        """
+    else:
+        prompt_template = """
+        Answer the question as detailed as possible from the provided context.
+        Context: \n {context}?\n
+        Question: \n{question}\n
+        Answer:
+        """
 
-def detect_open_domain_hallucination(input_text, completion, num_runs=5, threshold=0.5):
-    hallucination_count = 0
-    prompt_template = """
-    You are an AI assistant tasked with detecting open-domain hallucinations in the following response. 
-    An open-domain hallucination is an inaccurate or unmotivated claim about the world.
-    Please answer with "Yes" or "No" and provide a brief explanation.
+    model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    return chain
 
-    Input: {input_text}
+def user_input(user_question, platform):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    new_db = FAISS.load_local("faiss_index")
+    docs = new_db.similarity_search(user_question)
+    chain = get_conversational_chain(platform)
+    response = chain({'input_documents': docs, 'question': user_question}, return_only_outputs=True)
+    print(response)
+    st.write("Reply: ", response["output_text"])
 
-    Response: {completion}
-
-    Does the response contain open-domain hallucinations? Explain your reasoning.
-    """
-
-    def get_hallucination_judgment(input_text, completion):
-        prompt = prompt_template.format(input_text=input_text, completion=completion)
-        response = qa_pipeline(question=prompt, context=completion)
-        return response['answer'].strip()
-
-    for _ in range(num_runs):
-        judgment = get_hallucination_judgment(input_text, completion)
-        if "yes" in judgment.lower():
-            hallucination_count += 1
-
-    hallucination_score = hallucination_count / num_runs
-    return hallucination_score > threshold, hallucination_score
-
-# Iterate over rows in the DataFrame and calculate hallucinations
-results = []
-
-for row in df.collect():
-    input_value = row.input.value if hasattr(row, 'input') else None
-    output_value = row.output.value if hasattr(row, 'output') else None
+def main():
+    st.set_page_config("Digital Marketing")
+    st.header("Generate Derivative Content")
     
-    if input_value and output_value:
-        input_prompt = extract_prompt(input_value)
-        output_prompt = extract_prompt(output_value)
+    platform = st.selectbox(
+        "Select the platform for the output:",
+        ("Twitter", "LinkedIn", "Other")
+    )
+    
+    user_question = st.text_input("Ask a Question from the PDF Files")
+    
+    if user_question:
+        user_input(user_question, platform)
         
-        if input_prompt and output_prompt:
-            is_hallucination, score = detect_open_domain_hallucination(input_prompt, output_prompt)
-            results.append((input_prompt, output_prompt, is_hallucination, score))
+    with st.sidebar:
+        st.title("Menu:")
+        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the submit and process")
+        if st.button("Submit & Process"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                textchunks = get_text_chunks(raw_text)
+                get_vector_store(textchunks)
+                st.success("Done")
 
-# Print or store the results
-for result in results:
-    print(f"Input: {result[0]}")
-    print(f"Output: {result[1]}")
-    print(f"Is Hallucination: {result[2]}, Score: {result[3]}")
-    print("-" * 80)
-
-# Optionally, save results back to Delta Table
-results_df = spark.createDataFrame(results, schema=["input_prompt", "output_response", "is_hallucination", "score"])
-results_df.write.format("delta").mode("overwrite").save("path_to_save_results_delta_table")
+if __name__ == "__main__":
+    main()
