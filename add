@@ -10,8 +10,18 @@ import faiss
 
 # Load environment variables
 load_dotenv()
+
+# Debugging: Print environment variables
+print("AZURE_OPENAI_API_KEY:", os.getenv("AZURE_OPENAI_API_KEY"))
+print("AZURE_OPENAI_ENDPOINT:", os.getenv("AZURE_OPENAI_ENDPOINT"))
+
+# Get environment variables
 azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
 azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+
+# Ensure API key is a string
+if not isinstance(azure_openai_api_key, str):
+    raise ValueError("API key must be a string.")
 
 # Initialize Azure Text Analytics client
 credential = AzureKeyCredential(azure_openai_api_key)
