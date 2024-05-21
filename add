@@ -63,6 +63,22 @@ def get_vector_store(text_chunks):
         st.error("Failed to generate embeddings. Please check your configuration and try again.")
         return None
 
+def create_azure_openai_chain(prompt_template):
+    # Placeholder for actual chain implementation using Azure OpenAI
+    # This should be replaced with the actual logic to create a conversational chain using Azure OpenAI
+    class DummyChain:
+        def __init__(self, prompt):
+            self.prompt = prompt
+
+        def __call__(self, inputs, return_only_outputs=True):
+            context = inputs.get('input_documents', [])
+            question = inputs.get('question', '')
+            # Dummy response based on context and question
+            response_text = f"Dummy response based on context: {context} and question: {question}"
+            return {"output_text": response_text}
+    
+    return DummyChain(prompt_template)
+
 def get_conversational_chain(platform):
     if platform == "Twitter":
         prompt_template = """
@@ -86,12 +102,10 @@ def get_conversational_chain(platform):
         Answer:
         """
     
-    # Placeholder for actual chain implementation using Azure OpenAI (adjust as needed)
-    # Example assumes a hypothetical function that takes the prompt_template and returns a QA chain
     chain = create_azure_openai_chain(prompt_template)
     return chain
 
-def user_input(user_question, platform):
+def user_input(user_question, platform, text_chunks):
     index = faiss.read_index("faiss_index")
     query_embedding = generate_embeddings([user_question])[0]
     D, I = index.search(np.array([query_embedding]), k=5)
@@ -113,8 +127,11 @@ def main():
     
     user_question = st.text_input("Ask a Question from the PDF Files")
     
-    if user_question:
-        user_input(user_question, platform)
+    if 'text_chunks' not in st.session_state:
+        st.session_state.text_chunks = []
+    
+    if user_question and st.session_state.text_chunks:
+        user_input(user_question, platform, st.session_state.text_chunks)
         
     with st.sidebar:
         st.title("Menu:")
@@ -122,8 +139,8 @@ def main():
         if st.button("Submit & Process"):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
-                text_chunks = get_text_chunks(raw_text)
-                get_vector_store(text_chunks)
+                st.session_state.text_chunks = get_text_chunks(raw_text)
+                get_vector_store(st.session_state.text_chunks)
                 st.success("Done")
 
 if __name__ == "__main__":
