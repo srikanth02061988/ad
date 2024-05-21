@@ -2,7 +2,7 @@ import streamlit as st
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, get_token_provider
 import openai
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
@@ -17,10 +17,17 @@ openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
 openai.api_version = "2022-12-01"
 openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
+# Example function for embedding
+def get_embedding(text):
+    response = openai.Embedding.create(
+        input=text,
+        engine="text-embedding-ada-002"  # Update with the correct engine name
+    )
+    return response['data'][0]['embedding']
+
 def get_pdf_text(pdf_docs):
     text = ""
     reader = PdfReader(pdf_docs)
-    number_of_pages = len(reader.pages)
     for page in reader.pages:
         text += page.extract_text()
     return text
@@ -35,13 +42,6 @@ def get_vector_store(text_chunks):
     vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
     return vector_store
-
-def get_embedding(text):
-    response = openai.Embedding.create(
-        input=text,
-        engine="text-embedding-ada-002"
-    )
-    return response['data'][0]['embedding']
 
 def get_conversational_chain(platform):
     if platform == "Twitter":
@@ -66,8 +66,7 @@ def get_conversational_chain(platform):
         Answer:
         """
 
-    # Update this to use Azure OpenAI model
-    model = ChatOpenAI(model="text-davinci-002", temperature=0.3)
+    model = openai.Completion.create  # Using Azure OpenAI for completion
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
     return chain
