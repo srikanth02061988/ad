@@ -16,30 +16,6 @@ openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
 openai.api_version = "2022-12-01"
 openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
-# Connect to PostgreSQL database
-conn = psycopg2.connect(
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT"),
-    database=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD")
-)
-
-# Create table if it doesn't exist
-def create_table():
-    with conn.cursor() as cur:
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS website.embeddings (
-            id BIGSERIAL PRIMARY KEY,
-            category TEXT,
-            content TEXT,
-            embedding BYTEA
-        );
-        """)
-        conn.commit()
-
-create_table()
-
 def get_embeddings(text):
     response = openai.Embedding.create(
         input=text.replace("\n", " "),
@@ -61,12 +37,34 @@ def get_text_chunks(text):
     return chunks
 
 def store_embeddings_in_db(text_chunks, category):
+    # Connect to PostgreSQL database
+    conn = psycopg2.connect(
+        host='localhost',
+        port='5432',
+        database='your_database_name',
+        user='your_database_user',
+        password='your_database_password'
+    )
+    
+    # Create table if it doesn't exist
+    with conn.cursor() as cur:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS website.embeddings (
+            id BIGSERIAL PRIMARY KEY,
+            category TEXT,
+            content TEXT,
+            embedding BYTEA
+        );
+        """)
+        conn.commit()
+    
     embeddings = [get_embeddings(chunk) for chunk in text_chunks]
     data_list = [(category, chunk, np.array(embedding).tobytes()) for chunk, embedding in zip(text_chunks, embeddings)]
 
     with conn.cursor() as cur:
         execute_values(cur, "INSERT INTO website.embeddings (category, content, embedding) VALUES %s", data_list)
     conn.commit()
+    conn.close()
 
 def get_conversational_chain(platform):
     if platform == "Twitter":
@@ -97,10 +95,20 @@ def get_conversational_chain(platform):
     return chain
 
 def user_input(user_question, platform):
+    # Connect to PostgreSQL database
+    conn = psycopg2.connect(
+        host='localhost',
+        port='5432',
+        database='your_database_name',
+        user='your_database_user',
+        password='your_database_password'
+    )
+    
     with conn.cursor() as cur:
         cur.execute("SELECT content, embedding FROM website.embeddings WHERE category = %s", (platform,))
         rows = cur.fetchall()
-    
+    conn.close()
+
     # Converting the stored embeddings back to a format usable by FAISS
     docs = [row[0] for row in rows]
     embeddings = [np.frombuffer(row[1], dtype=np.float32) for row in rows]
@@ -126,11 +134,12 @@ def main():
     )
     pdf_docs = st.sidebar.file_uploader("Upload your PDF Files and Click on the submit and process", type=["pdf"])
     if st.sidebar.button("Submit & Process"):
-        with st.spinner("Processing..."):
-            raw_text = get_pdf_text(pdf_docs)
-            textchunks = get_text_chunks(raw_text)
-            store_embeddings_in_db(textchunks, pdf_category)
-            st.sidebar.success("Done")
+        if pdf_docs is not None:
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                textchunks = get_text_chunks(raw_text)
+                store_embeddings_in_db(textchunks, pdf_category)
+                st.sidebar.success("Done")
 
     platform = st.selectbox(
         "Select the platform for the output:",
