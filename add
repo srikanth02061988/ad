@@ -1,137 +1,98 @@
 import streamlit as st
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import os
 import openai
 import psycopg2
 from psycopg2.extras import execute_values
 import numpy as np
-from langchain.vectorstores import FAISS
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Set up Azure OpenAI credentials
 openai.api_type = "azure"
-openai.api_base = "https://effopenai.openai.azure.com/"
-openai.api_version = "2024-02-15-preview"  # Use the correct API version from the image
-openai.api_key = os.getenv("EFF_OAI_Key")
+openai.api_base = ""
+openai.api_version = "2024-05-14"
+openai.api_key = "7896c56d537d4f19803a4ac85b9d9bc9"
 
 # Create an OpenAI client
-client = openai.Client(api_key=openai.api_key, timeout=600)  # Increase timeout to 10 minutes
+client = openai.Client(api_key="7896c56d537d4f19803a4ac85b9d9bc9", timeout=120)
 
 def get_embeddings(text, client, deployment="text-embedding-ada-002"):
     try:
+        logger.info("Generating embeddings for the text chunk")
         response = client.embeddings.create(
             input=[text],
             model=deployment
         )
         embedding = response['data'][0]['embedding']
+        logger.info("Embeddings generated successfully")
         return embedding
     except openai.error.OpenAIError as e:
-        st.error(f"An error occurred: {e}")
+        logger.error(f"Error generating embeddings: {e}")
+        st.error(f"An error occurred while generating embeddings: {e}")
         return None
 
 def get_pdf_text(pdf_docs):
     text = ""
-    reader = PdfReader(pdf_docs)
-    for page in reader.pages:
-        text += page.extract_text()
+    try:
+        logger.info("Extracting text from PDF")
+        reader = PdfReader(pdf_docs)
+        for page in reader.pages:
+            text += page.extract_text()
+        logger.info("Text extraction from PDF successful")
+    except Exception as e:
+        logger.error(f"Error extracting text from PDF: {e}")
+        st.error(f"An error occurred while extracting text from PDF: {e}")
     return text
 
 def get_text_chunks(text):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)  # Reduce chunk size
+    logger.info("Splitting text into chunks")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
     chunks = text_splitter.split_text(text)
+    logger.info(f"Text split into {len(chunks)} chunks")
     return chunks
 
 def store_embeddings_in_db(text_chunks, category, client):
-    # Connect to PostgreSQL database
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        database=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD")
-    )
-    
-    # Create table if it doesn't exist
-    with conn.cursor() as cur:
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS website.embeddings (
-            id BIGSERIAL PRIMARY KEY,
-            category TEXT,
-            content TEXT,
-            embedding BYTEA
-        );
-        """)
-        conn.commit()
-    
-    embeddings = []
-    for chunk in text_chunks:
-        embedding = get_embeddings(chunk, client)
-        if embedding is not None:
-            embeddings.append((category, chunk, np.array(embedding).tobytes()))
+    try:
+        logger.info("Connecting to PostgreSQL database")
+        conn = psycopg2.connect(
+            host="npeceffpsql.postgres.database.azure.com",
+            port="5432",
+            database="Digital_marketing_Embeddings",
+            user="pgadmin",
+            password="npeceffR8S"
+        )
 
-    with conn.cursor() as cur:
-        execute_values(cur, "INSERT INTO website.embeddings (category, content, embedding) VALUES %s", embeddings)
-    conn.commit()
-    conn.close()
+        with conn.cursor() as cur:
+            logger.info("Creating table if it does not exist")
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS embeddings (
+                id BIGSERIAL PRIMARY KEY,
+                category TEXT,
+                content TEXT,
+                embedding BYTEA
+            );
+            """)
+            conn.commit()
 
-def get_conversational_chain(platform):
-    if platform == "Twitter":
-        prompt_template = """
-        Answer the question as detailed as possible from the provided context in a concise manner suitable for a Twitter post. Ensure the response does not exceed 280 characters. If the answer is not in provided context just say, "answer is not available in the context".
-        Context: \n{context}\n
-        Question: \n{question}\n
-        Answer:
-        """
-    elif platform == "LinkedIn":
-        prompt_template = """
-        Answer the question as detailed as possible from the provided context in a professional manner suitable for a LinkedIn post. Ensure the response is within 1,300 to 2,000 characters. If the answer is not in provided context just say, "answer is not available in the context".
-        Context: \n{context}\n
-        Question: \n{question}\n
-        Answer:
-        """
-    else:
-        prompt_template = """
-        Answer the question as detailed as possible from the provided context. If the answer is not in provided context just say, "answer is not available in the context".
-        Context: \n{context}\n
-        Question: \n{question}\n
-        Answer:
-        """
+        embeddings = []
+        for chunk in text_chunks:
+            embedding = get_embeddings(chunk, client)
+            if embedding is not None:
+                embeddings.append((category, chunk, np.array(embedding).tobytes()))
 
-    model = openai.Completion.create  # Using Azure OpenAI for completion
-    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
-    return chain
-
-def user_input(user_question, platform):
-    # Connect to PostgreSQL database
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        database=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD")
-    )
-    
-    with conn.cursor() as cur:
-        cur.execute("SELECT content, embedding FROM website.embeddings WHERE category = %s", (platform,))
-        rows = cur.fetchall()
-    conn.close()
-
-    # Converting the stored embeddings back to a format usable by FAISS
-    docs = [row[0] for row in rows]
-    embeddings = [np.frombuffer(row[1], dtype=np.float32) for row in rows]
-
-    # Rebuild FAISS index from the database
-    vector_store = FAISS.from_texts(docs, embeddings)
-    vector_store.save_local("faiss_index")
-
-    new_db = FAISS.load_local("faiss_index")
-    docs = new_db.similarity_search(user_question)
-    chain = get_conversational_chain(platform)
-    response = chain({'input_documents': docs, 'question': user_question}, return_only_outputs=True)
-    st.write("Reply: ", response["output_text"])
+        with conn.cursor() as cur:
+            logger.info("Inserting embeddings into the database")
+            execute_values(cur, "INSERT INTO embeddings (category, content, embedding) VALUES %s", embeddings)
+            conn.commit()
+        conn.close()
+        logger.info("Embeddings stored in the database successfully")
+    except Exception as e:
+        logger.error(f"Error storing embeddings in database: {e}")
+        st.error(f"An error occurred while storing embeddings in the database: {e}")
 
 def main():
     st.set_page_config(page_title="Digital Marketing")
@@ -142,24 +103,19 @@ def main():
         "Select the category for the PDF:",
         ("Twitter", "LinkedIn", "Other")
     )
+
     pdf_docs = st.sidebar.file_uploader("Upload your PDF Files and Click on the submit and process", type=["pdf"])
     if st.sidebar.button("Submit & Process"):
         if pdf_docs is not None:
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
-                textchunks = get_text_chunks(raw_text)
-                store_embeddings_in_db(textchunks, pdf_category, client)
-                st.sidebar.success("Done")
-
-    platform = st.selectbox(
-        "Select the platform for the output:",
-        ("Twitter", "LinkedIn", "Other")
-    )
-    
-    user_question = st.text_input("Ask a Question from the PDF Files")
-    
-    if user_question:
-        user_input(user_question, platform)
+                if raw_text:
+                    text_chunks = get_text_chunks(raw_text)
+                    store_embeddings_in_db(text_chunks, pdf_category, client)
+                else:
+                    logger.error("No text extracted from PDF")
+                    st.error("Failed to extract text from the uploaded PDF.")
+            st.sidebar.success("Done")
 
 if __name__ == "__main__":
     main()
