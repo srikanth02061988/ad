@@ -121,7 +121,7 @@ def retrieve_embeddings_from_db(pdf_id):
 
         with conn.cursor() as cur:
             logger.info(f"Retrieving embeddings for PDF ID: {pdf_id}")
-            cur.execute("SELECT content, embedding FROM embeddings WHERE pdf_id = %s", (pdf_id,))
+            cur.execute("SELECT content, embedding::vector FROM embeddings WHERE pdf_id = %s", (pdf_id,))
             rows = cur.fetchall()
         conn.close()
 
@@ -216,7 +216,3 @@ def main():
                     else:
                         st.error("Failed to generate responses.")
                 else:
-                    st.error("No relevant embeddings found for the uploaded PDF.")
-
-if __name__ == "__main__":
-    main()
