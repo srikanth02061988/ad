@@ -30,7 +30,7 @@ def get_embeddings(text, client, deployment="text-embedding-ada-002"):
         embedding = response['data'][0]['embedding']
         logger.info("Embeddings generated successfully")
         return embedding
-    except openai.error.OpenAIError as e:
+    except openai.OpenAIError as e:
         logger.error(f"Error generating embeddings: {e}")
         st.error(f"An error occurred while generating embeddings: {e}")
         return None
@@ -94,6 +94,35 @@ def store_embeddings_in_db(text_chunks, category, client):
         logger.error(f"Error storing embeddings in database: {e}")
         st.error(f"An error occurred while storing embeddings in the database: {e}")
 
+def retrieve_embeddings_from_db(category):
+    try:
+        logger.info("Connecting to PostgreSQL database for retrieval")
+        conn = psycopg2.connect(
+            host="npeceffpsql.postgres.database.azure.com",
+            port="5432",
+            database="Digital_marketing_Embeddings",
+            user="pgadmin",
+            password="npeceffR8S"
+        )
+
+        with conn.cursor() as cur:
+            logger.info(f"Retrieving embeddings for category: {category}")
+            cur.execute("SELECT content, embedding FROM embeddings WHERE category = %s", (category,))
+            rows = cur.fetchall()
+        conn.close()
+
+        if rows:
+            docs = [row[0] for row in rows]
+            embeddings = [np.frombuffer(row[1], dtype=np.float32) for row in rows]
+            return docs, embeddings
+        else:
+            logger.info("No embeddings found for the given category")
+            return None, None
+    except Exception as e:
+        logger.error(f"Error retrieving embeddings from database: {e}")
+        st.error(f"An error occurred while retrieving embeddings from the database: {e}")
+        return None, None
+
 def main():
     st.set_page_config(page_title="Digital Marketing")
     st.header("Generate Derivative Content")
@@ -116,6 +145,24 @@ def main():
                     logger.error("No text extracted from PDF")
                     st.error("Failed to extract text from the uploaded PDF.")
             st.sidebar.success("Done")
+
+    user_question = st.text_input("Ask a Question based on Category")
+    if user_question:
+        category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
+        if st.button("Submit Question"):
+            with st.spinner("Retrieving and processing..."):
+                docs, embeddings = retrieve_embeddings_from_db(category)
+                if docs and embeddings:
+                    model = openai.Completion.create
+                    prompt = f"Answer the question as detailed as possible from the provided context: \n{docs}\nQuestion: \n{user_question}\nAnswer: "
+                    response = model(
+                        model="text-davinci-003",
+                        prompt=prompt,
+                        max_tokens=500
+                    )
+                    st.write(f"Reply: {response.choices[0].text.strip()}")
+                else:
+                    st.error("No relevant embeddings found for the selected category.")
 
 if __name__ == "__main__":
     main()
