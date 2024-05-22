@@ -90,7 +90,7 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
             logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
-                embeddings.append((pdf_id, chunk, np.array(embedding)))  # Ensure embedding is numpy array
+                embeddings.append((pdf_id, chunk, embedding))  # Store as list
             else:
                 logger.error("Failed to generate embedding for a chunk, skipping it.")
 
