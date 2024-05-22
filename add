@@ -6,8 +6,7 @@ from psycopg2.extras import execute_values
 import numpy as np
 import logging
 import os
-from azure.ai.openai import OpenAIClient
-from azure.identity import DefaultAzureCredential
+import requests
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,24 +15,28 @@ logger = logging.getLogger(__name__)
 # Set up Azure OpenAI credentials
 azure_endpoint = os.getenv("EFF_OAI_BASE", "")
 azure_api_key = os.getenv("EFF_OAI_KEY", "")
-azure_api_version = "2024-05-14"
 
-# Initialize Azure OpenAI client
-credential = DefaultAzureCredential()
-az_client = OpenAIClient(endpoint=azure_endpoint, credential=credential)
+# Define headers for Azure OpenAI API requests
+headers = {
+    "Content-Type": "application/json",
+    "api-key": azure_api_key
+}
 
-def get_embeddings(text, client, deployment="text-embedding-ada-002"):
+def get_embeddings(text, endpoint, headers, deployment="text-embedding-ada-002"):
     try:
         logger.info(f"Generating embeddings for the text chunk: {text[:30]}")
-        response = client.embeddings.create(
-            deployment_id=deployment,
-            input=[text]
-        )
-        logger.info(f"Azure OpenAI API response: {response}")
-        embedding = response.data[0].embedding
+        url = f"{endpoint}/openai/deployments/{deployment}/embeddings?api-version=2024-05-14"
+        data = {
+            "input": text,
+            "deployment_id": deployment
+        }
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        embedding = result['data'][0]['embedding']
         logger.info("Embeddings generated successfully")
         return embedding
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         logger.error(f"Error generating embeddings: {e}")
         st.error(f"An error occurred while generating embeddings: {e}")
         return None
@@ -58,7 +61,7 @@ def get_text_chunks(text):
     logger.info(f"Text split into {len(chunks)} chunks")
     return chunks
 
-def store_embeddings_in_db(text_chunks, category, client):
+def store_embeddings_in_db(text_chunks, category, endpoint, headers):
     try:
         logger.info("Connecting to PostgreSQL database")
         conn = psycopg2.connect(
@@ -84,7 +87,7 @@ def store_embeddings_in_db(text_chunks, category, client):
         embeddings = []
         for chunk in text_chunks:
             logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
-            embedding = get_embeddings(chunk, client)
+            embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
                 embeddings.append((category, chunk, embedding))
             else:
@@ -150,7 +153,7 @@ def main():
                 raw_text = get_pdf_text(pdf_docs)
                 if raw_text:
                     text_chunks = get_text_chunks(raw_text)
-                    store_embeddings_in_db(text_chunks, pdf_category, az_client)
+                    store_embeddings_in_db(text_chunks, pdf_category, azure_endpoint, headers)
                 else:
                     logger.error("No text extracted from PDF")
                     st.error("Failed to extract text from the uploaded PDF.")
@@ -171,4 +174,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
