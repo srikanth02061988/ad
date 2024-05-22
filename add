@@ -17,15 +17,19 @@ openai.api_version = "2024-02-15-preview"  # Use the correct API version from th
 openai.api_key = os.getenv("EFF_OAI_Key")
 
 # Create an OpenAI client
-client = openai.Client()
+client = openai.Client(api_key=openai.api_key, timeout=600)  # Increase timeout to 10 minutes
 
 def get_embeddings(text, client, deployment="text-embedding-ada-002"):
-    response = client.embeddings.create(
-        input=[text],
-        model=deployment
-    )
-    embedding = response['data'][0]['embedding']
-    return embedding
+    try:
+        response = client.embeddings.create(
+            input=[text],
+            model=deployment
+        )
+        embedding = response['data'][0]['embedding']
+        return embedding
+    except openai.error.OpenAIError as e:
+        st.error(f"An error occurred: {e}")
+        return None
 
 def get_pdf_text(pdf_docs):
     text = ""
@@ -35,7 +39,7 @@ def get_pdf_text(pdf_docs):
     return text
 
 def get_text_chunks(text):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)  # Reduce chunk size
     chunks = text_splitter.split_text(text)
     return chunks
 
@@ -61,11 +65,14 @@ def store_embeddings_in_db(text_chunks, category, client):
         """)
         conn.commit()
     
-    embeddings = [get_embeddings(chunk, client) for chunk in text_chunks]
-    data_list = [(category, chunk, np.array(embedding).tobytes()) for chunk, embedding in zip(text_chunks, embeddings)]
+    embeddings = []
+    for chunk in text_chunks:
+        embedding = get_embeddings(chunk, client)
+        if embedding is not None:
+            embeddings.append((category, chunk, np.array(embedding).tobytes()))
 
     with conn.cursor() as cur:
-        execute_values(cur, "INSERT INTO website.embeddings (category, content, embedding) VALUES %s", data_list)
+        execute_values(cur, "INSERT INTO website.embeddings (category, content, embedding) VALUES %s", embeddings)
     conn.commit()
     conn.close()
 
