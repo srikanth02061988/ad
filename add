@@ -27,8 +27,7 @@ def get_embeddings(text, endpoint, headers, deployment="text-embedding-ada-002")
         logger.info(f"Generating embeddings for the text chunk: {text[:30]}")
         url = f"{endpoint}/openai/deployments/{deployment}/embeddings?api-version=2024-05-14"
         data = {
-            "input": text,
-            "deployment_id": deployment
+            "input": text
         }
         response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
