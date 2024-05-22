@@ -80,7 +80,7 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
                 id BIGSERIAL PRIMARY KEY,
                 pdf_id UUID,
                 content TEXT,
-                embedding JSONB
+                embedding vector(1536)  -- Adjust dimension size as needed
             );
             """)
             conn.commit()
@@ -90,7 +90,7 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
             logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
-                embeddings.append((pdf_id, chunk, json.dumps(embedding)))  # Store as JSON string
+                embeddings.append((pdf_id, chunk, embedding))  # Store as vector
             else:
                 logger.error("Failed to generate embedding for a chunk, skipping it")
 
@@ -127,7 +127,7 @@ def retrieve_embeddings_from_db(pdf_id):
 
         if rows:
             docs = [row[0] for row in rows]
-            embeddings = [np.array(json.loads(row[1]), dtype=np.float32) for row in rows]  # Convert JSON string to numpy array
+            embeddings = [np.array(row[1], dtype=np.float32) for row in rows]  # Convert to numpy array
             return docs, embeddings
         else:
             logger.info("No embeddings found for the given PDF ID")
@@ -192,6 +192,7 @@ def main():
             st.sidebar.success("Done")
 
     if "pdf_id" in st.session_state:
+        category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
         user_question = st.text_input("Ask a Question based on the uploaded PDF")
         if user_question and st.button("Submit Question"):
             with st.spinner("Retrieving and processing..."):
