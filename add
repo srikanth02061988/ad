@@ -78,7 +78,7 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
                 id BIGSERIAL PRIMARY KEY,
                 pdf_id UUID,
                 content TEXT,
-                embedding TEXT  -- Store embeddings as TEXT
+                embedding JSONB  -- Store embeddings as JSONB
             );
             """)
             conn.commit()
@@ -88,8 +88,8 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
             logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
-                embedding_str = ','.join(map(str, embedding))  # Convert to string
-                embeddings.append((pdf_id, chunk, embedding_str))  # Store as list
+                embedding_json = json.dumps(embedding)  # Convert to JSON string
+                embeddings.append((pdf_id, chunk, embedding_json))  # Store as list
             else:
                 logger.error("Failed to generate embedding for a chunk, skipping it.")
 
@@ -126,7 +126,7 @@ def retrieve_embeddings_from_db(pdf_id):
 
         if rows:
             docs = [row[0] for row in rows]
-            embeddings = [np.array(list(map(float, row[1].split(','))), dtype=np.float32) for row in rows]  # Convert back to numpy array
+            embeddings = [np.array(json.loads(row[1]), dtype=np.float32) for row in rows]  # Convert back to numpy array
             return docs, embeddings
         else:
             logger.info("No embeddings found for the given PDF ID.")
