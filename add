@@ -81,9 +81,12 @@ def store_embeddings_in_db(text_chunks, category, client):
 
         embeddings = []
         for chunk in text_chunks:
+            logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, client)
             if embedding is not None:
                 embeddings.append((category, chunk, np.array(embedding).tolist()))
+            else:
+                logger.error("Failed to generate embedding for a chunk, skipping it")
 
         if embeddings:
             with conn.cursor() as cur:
