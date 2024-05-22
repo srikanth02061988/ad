@@ -1,16 +1,10 @@
-import streamlit as st
-from PyPDF2 import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 import openai
-import psycopg2
-from psycopg2.extras import execute_values
-import numpy as np
-import logging
 import os
+import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 # Set up Azure OpenAI credentials
 openai.api_type = "azure"
@@ -21,153 +15,28 @@ openai.api_key = os.getenv("EFF_OAI_KEY", "")
 # Create an OpenAI client
 client = openai.Client(api_key=openai.api_key, timeout=120)
 
-def get_embeddings(text, client, deployment="text-embedding-ada-002"):
+def test_openai_connection():
+    sample_text = "This is a test to verify the connection to the OpenAI API."
     try:
-        logger.info("Generating embeddings for the text chunk")
+        logger.info("Generating embeddings for the sample text")
         response = client.embeddings.create(
-            input=[text],
-            model=deployment
+            input=[sample_text],
+            model="text-embedding-ada-002"
         )
+        logger.info(f"OpenAI API response: {response}")
         embedding = response['data'][0]['embedding']
         logger.info("Embeddings generated successfully")
         return embedding
     except openai.OpenAIError as e:
         logger.error(f"Error generating embeddings: {e}")
-        st.error(f"An error occurred while generating embeddings: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
         return None
 
-def get_pdf_text(pdf_docs):
-    text = ""
-    try:
-        logger.info("Extracting text from PDF")
-        reader = PdfReader(pdf_docs)
-        for page in reader.pages:
-            text += page.extract_text()
-        logger.info("Text extraction from PDF successful")
-    except Exception as e:
-        logger.error(f"Error extracting text from PDF: {e}")
-        st.error(f"An error occurred while extracting text from PDF: {e}")
-    return text
-
-def get_text_chunks(text):
-    logger.info("Splitting text into chunks")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
-    chunks = text_splitter.split_text(text)
-    logger.info(f"Text split into {len(chunks)} chunks")
-    return chunks
-
-def store_embeddings_in_db(text_chunks, category, client):
-    try:
-        logger.info("Connecting to PostgreSQL database")
-        conn = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD")
-        )
-
-        with conn.cursor() as cur:
-            logger.info("Creating table if it does not exist")
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS embeddings (
-                id BIGSERIAL PRIMARY KEY,
-                category TEXT,
-                content TEXT,
-                embedding VECTOR(1536)
-            );
-            """)
-            conn.commit()
-
-        embeddings = []
-        for chunk in text_chunks:
-            logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
-            embedding = get_embeddings(chunk, client)
-            if embedding is not None:
-                embeddings.append((category, chunk, np.array(embedding).tolist()))
-            else:
-                logger.error("Failed to generate embedding for a chunk, skipping it")
-
-        if embeddings:
-            with conn.cursor() as cur:
-                logger.info("Inserting embeddings into the database")
-                execute_values(cur, "INSERT INTO embeddings (category, content, embedding) VALUES %s", embeddings)
-                conn.commit()
-        else:
-            logger.error("No embeddings generated to store in the database")
-
-        conn.close()
-        logger.info("Embeddings stored in the database successfully")
-    except Exception as e:
-        logger.error(f"Error storing embeddings in database: {e}")
-        st.error(f"An error occurred while storing embeddings in the database: {e}")
-
-def retrieve_embeddings_from_db(category):
-    try:
-        logger.info("Connecting to PostgreSQL database for retrieval")
-        conn = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD")
-        )
-
-        with conn.cursor() as cur:
-            logger.info(f"Retrieving embeddings for category: {category}")
-            cur.execute("SELECT content, embedding FROM embeddings WHERE category = %s", (category,))
-            rows = cur.fetchall()
-        conn.close()
-
-        if rows:
-            docs = [row[0] for row in rows]
-            embeddings = [np.array(row[1], dtype=np.float32) for row in rows]
-            return docs, embeddings
-        else:
-            logger.info("No embeddings found for the given category")
-            return None, None
-    except Exception as e:
-        logger.error(f"Error retrieving embeddings from database: {e}")
-        st.error(f"An error occurred while retrieving embeddings from the database: {e}")
-        return None, None
-
-def main():
-    st.set_page_config(page_title="Digital Marketing")
-    st.header("Generate Derivative Content")
-
-    st.sidebar.title("Menu:")
-    pdf_category = st.sidebar.selectbox(
-        "Select the category for the PDF:",
-        ("Twitter", "LinkedIn", "Other")
-    )
-
-    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files and Click on the submit and process", type=["pdf"])
-    if st.sidebar.button("Submit & Process"):
-        if pdf_docs is not None:
-            with st.spinner("Processing..."):
-                raw_text = get_pdf_text(pdf_docs)
-                if raw_text:
-                    text_chunks = get_text_chunks(raw_text)
-                    store_embeddings_in_db(text_chunks, pdf_category, client)
-                else:
-                    logger.error("No text extracted from PDF")
-                    st.error("Failed to extract text from the uploaded PDF.")
-            st.sidebar.success("Done")
-
-    user_question = st.text_input("Ask a Question based on Category")
-    if user_question:
-        category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
-        if st.button("Submit Question"):
-            with st.spinner("Retrieving and processing..."):
-                docs, embeddings = retrieve_embeddings_from_db(category)
-                if docs and embeddings:
-                    # Here, you need to process embeddings to find the best match for the question.
-                    # Since OpenAI's GPT-3 cannot directly search through embeddings, you might need additional logic to match the question to the embeddings.
-                    st.write(f"Embeddings retrieved for category '{category}':")
-                    for doc in docs:
-                        st.write(doc)
-                else:
-                    st.error("No relevant embeddings found for the selected category.")
-
-if _name_ == "_main_":
-    main()
+if __name__ == "__main__":
+    embedding = test_openai_connection()
+    if embedding:
+        print("Successfully connected to the OpenAI API and generated embeddings.")
+    else:
+        print("Failed to connect to the OpenAI API or generate embeddings.")
