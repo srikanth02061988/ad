@@ -18,8 +18,8 @@ openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
 def get_embeddings(text):
     response = openai.Embedding.create(
-        input=text.replace("\n", " "),
-        engine="text-embedding-ada-002"  # Update with the correct engine name
+        model="text-embedding-ada-002",
+        input=[text]
     )
     embedding = response['data'][0]['embedding']
     return embedding
