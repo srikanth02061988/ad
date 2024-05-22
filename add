@@ -12,14 +12,17 @@ from langchain.prompts import PromptTemplate
 
 # Set up Azure OpenAI credentials
 openai.api_type = "azure"
-openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
-openai.api_version = "2022-12-01"
-openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
+openai.api_base = "https://effopenai.openai.azure.com/"
+openai.api_version = "2024-02-15-preview"  # Use the correct API version from the image
+openai.api_key = os.getenv("EFF_OAI_Key")
 
-def get_embeddings(text):
-    response = openai.Embedding.create(
-        model="text-embedding-ada-002",
-        input=[text]
+# Create an OpenAI client
+client = openai.Client()
+
+def get_embeddings(text, client, deployment="text-embedding-ada-002"):
+    response = client.embeddings.create(
+        input=[text],
+        model=deployment
     )
     embedding = response['data'][0]['embedding']
     return embedding
@@ -36,14 +39,14 @@ def get_text_chunks(text):
     chunks = text_splitter.split_text(text)
     return chunks
 
-def store_embeddings_in_db(text_chunks, category):
+def store_embeddings_in_db(text_chunks, category, client):
     # Connect to PostgreSQL database
     conn = psycopg2.connect(
-        host='localhost',
-        port='5432',
-        database='your_database_name',
-        user='your_database_user',
-        password='your_database_password'
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
     )
     
     # Create table if it doesn't exist
@@ -58,7 +61,7 @@ def store_embeddings_in_db(text_chunks, category):
         """)
         conn.commit()
     
-    embeddings = [get_embeddings(chunk) for chunk in text_chunks]
+    embeddings = [get_embeddings(chunk, client) for chunk in text_chunks]
     data_list = [(category, chunk, np.array(embedding).tobytes()) for chunk, embedding in zip(text_chunks, embeddings)]
 
     with conn.cursor() as cur:
@@ -97,11 +100,11 @@ def get_conversational_chain(platform):
 def user_input(user_question, platform):
     # Connect to PostgreSQL database
     conn = psycopg2.connect(
-        host='localhost',
-        port='5432',
-        database='your_database_name',
-        user='your_database_user',
-        password='your_database_password'
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
     )
     
     with conn.cursor() as cur:
@@ -138,7 +141,7 @@ def main():
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
                 textchunks = get_text_chunks(raw_text)
-                store_embeddings_in_db(textchunks, pdf_category)
+                store_embeddings_in_db(textchunks, pdf_category, client)
                 st.sidebar.success("Done")
 
     platform = st.selectbox(
