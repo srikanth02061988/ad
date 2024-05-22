@@ -6,7 +6,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 import numpy as np
 import logging
-import time
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,12 +14,12 @@ logger = logging.getLogger(_name_)
 
 # Set up Azure OpenAI credentials
 openai.api_type = "azure"
-openai.api_base = ""
+openai.api_base = os.getenv("EFF_OAI_BASE", "")
 openai.api_version = "2024-05-14"
-openai.api_key = "7896c56d537d4f19803a4ac85b9d9bc9"
+openai.api_key = os.getenv("EFF_OAI_KEY", "")
 
 # Create an OpenAI client
-client = openai.Client(api_key="7896c56d537d4f19803a4ac85b9d9bc9", timeout=120)
+client = openai.Client(api_key=openai.api_key, timeout=120)
 
 def get_embeddings(text, client, deployment="text-embedding-ada-002"):
     try:
@@ -60,11 +60,11 @@ def store_embeddings_in_db(text_chunks, category, client):
     try:
         logger.info("Connecting to PostgreSQL database")
         conn = psycopg2.connect(
-            host="npeceffpsql.postgres.database.azure.com",
-            port="5432",
-            database="Digital_marketing_Embeddings",
-            user="pgadmin",
-            password="npeceffR8S"
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD")
         )
 
         with conn.cursor() as cur:
@@ -74,21 +74,16 @@ def store_embeddings_in_db(text_chunks, category, client):
                 id BIGSERIAL PRIMARY KEY,
                 category TEXT,
                 content TEXT,
-                embedding BYTEA
+                embedding VECTOR(1536)
             );
             """)
             conn.commit()
 
         embeddings = []
         for chunk in text_chunks:
-            for attempt in range(3):  # Retry up to 3 times
-                embedding = get_embeddings(chunk, client)
-                if embedding is not None:
-                    embeddings.append((category, chunk, np.array(embedding).tobytes()))
-                    break
-                else:
-                    logger.info(f"Retrying embedding generation (attempt {attempt + 1}/3)")
-                    time.sleep(2)  # Wait 2 seconds before retrying
+            embedding = get_embeddings(chunk, client)
+            if embedding is not None:
+                embeddings.append((category, chunk, np.array(embedding).tolist()))
 
         if embeddings:
             with conn.cursor() as cur:
@@ -108,11 +103,11 @@ def retrieve_embeddings_from_db(category):
     try:
         logger.info("Connecting to PostgreSQL database for retrieval")
         conn = psycopg2.connect(
-            host="npeceffpsql.postgres.database.azure.com",
-            port="5432",
-            database="Digital_marketing_Embeddings",
-            user="pgadmin",
-            password="npeceffR8S"
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD")
         )
 
         with conn.cursor() as cur:
@@ -123,7 +118,7 @@ def retrieve_embeddings_from_db(category):
 
         if rows:
             docs = [row[0] for row in rows]
-            embeddings = [np.frombuffer(row[1], dtype=np.float32) for row in rows]
+            embeddings = [np.array(row[1], dtype=np.float32) for row in rows]
             return docs, embeddings
         else:
             logger.info("No embeddings found for the given category")
