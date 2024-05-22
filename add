@@ -7,6 +7,7 @@ import numpy as np
 import logging
 import os
 import requests
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -78,7 +79,7 @@ def store_embeddings_in_db(text_chunks, category, endpoint, headers):
                 id BIGSERIAL PRIMARY KEY,
                 category TEXT,
                 content TEXT,
-                embedding vector(1536)
+                embedding JSONB
             );
             """)
             conn.commit()
@@ -88,7 +89,7 @@ def store_embeddings_in_db(text_chunks, category, endpoint, headers):
             logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
-                embeddings.append((category, chunk, embedding))
+                embeddings.append((category, chunk, json.dumps(embedding)))  # Store as JSON string
             else:
                 logger.error("Failed to generate embedding for a chunk, skipping it")
 
@@ -125,7 +126,7 @@ def retrieve_embeddings_from_db(category):
 
         if rows:
             docs = [row[0] for row in rows]
-            embeddings = [np.array(row[1], dtype=np.float32) for row in rows]  # Convert to numpy array
+            embeddings = [np.array(json.loads(row[1]), dtype=np.float32) for row in rows]  # Convert JSON string to numpy array
             return docs, embeddings
         else:
             logger.info("No embeddings found for the given category")
