@@ -88,7 +88,8 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
             logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
-                embeddings.append((pdf_id, chunk, embedding))  # Store as list
+                embedding_vector = list(map(float, embedding))  # Ensure the embedding is a list of floats
+                embeddings.append((pdf_id, chunk, embedding_vector))  # Store as list
             else:
                 logger.error("Failed to generate embedding for a chunk, skipping it.")
 
@@ -119,13 +120,13 @@ def retrieve_embeddings_from_db(pdf_id):
 
         with conn.cursor() as cur:
             logger.info(f"Retrieving embeddings for PDF ID: {pdf_id}...")
-            cur.execute("SELECT content, embedding FROM embeddings WHERE pdf_id = %s", (pdf_id,))
+            cur.execute("SELECT content, embedding::text FROM embeddings WHERE pdf_id = %s", (pdf_id,))
             rows = cur.fetchall()
         conn.close()
 
         if rows:
             docs = [row[0] for row in rows]
-            embeddings = [np.array(row[1], dtype=np.float32) for row in rows]  # Convert to numpy array
+            embeddings = [np.array(list(map(float, row[1][1:-1].split(','))), dtype=np.float32) for row in rows]  # Convert to numpy array
             return docs, embeddings
         else:
             logger.info("No embeddings found for the given PDF ID.")
