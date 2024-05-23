@@ -153,10 +153,21 @@ def generate_responses(question, relevant_docs, endpoint, headers, deployment=co
             "prompt": prompt,
             "max_tokens": 50  # Adjust this based on your requirements
         }
+        
+        logger.info(f"Request Payload: {json.dumps(data)}")
+        
         response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
+        
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTPError: {e.response.text}")
+            raise e
+        
         result = response.json()
         text_response = result['choices'][0]['text'].strip()
+        
+        logger.info(f"Response from OpenAI: {text_response}")
         
         return text_response
     except requests.exceptions.RequestException as e:
