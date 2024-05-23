@@ -21,14 +21,17 @@ azure_api_key = os.getenv("EFF_OAI_KEY", "")
 embedding_deployment = "TEB-Robin"  # Embeddings deployment
 completion_deployment = "GPT4_robin"  # Completions deployment
 
-# Define headers for Azure OpenAI API requests
-headers = {
-    "Content-Type": "application/json",
-    "api-key": azure_api_key
-}
+# Initialize AzureOpenAI client for embeddings
+embedding_client = AzureOpenAI(
+    api_version="2024-02-15-preview",
+    azure_endpoint=azure_endpoint,
+    api_key=azure_api_key
+)
 
-# Initialize AzureOpenAI client
-client = AzureOpenAI(
+# Initialize AzureOpenAI client for completions
+completion_client = AzureOpenAI(
+    api_version="2023-09-15-preview",
+    azure_endpoint=azure_endpoint,
     api_key=azure_api_key
 )
 
@@ -37,8 +40,7 @@ def get_embeddings(text, client, deployment=embedding_deployment):
         logger.info(f"Generating embeddings for the text chunk: {text[:30]}...")
         response = client.embeddings.create(
             model=deployment,
-            input=text,
-            api_version="2024-02-15-preview"
+            input=text
         )
         embedding = response['data'][0]['embedding']
         logger.info("Embeddings generated successfully.")
@@ -159,8 +161,7 @@ def generate_responses(question, relevant_docs, client, deployment=completion_de
             messages=[
                 {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
                 {"role": "user", "content": prompt}
-            ],
-            api_version="2023-09-15-preview"
+            ]
         )
         
         text_response = response.choices[0].message.content.strip()
@@ -187,7 +188,7 @@ def main():
                 if raw_text:
                     text_chunks = get_text_chunks(raw_text)
                     pdf_id = str(uuid.uuid4())
-                    store_embeddings_in_db(pdf_id, text_chunks, client)
+                    store_embeddings_in_db(pdf_id, text_chunks, embedding_client)
                     st.session_state["pdf_id"] = pdf_id  # Store PDF ID in session state
                 else:
                     logger.error("No text extracted from PDF.")
@@ -203,7 +204,7 @@ def main():
                 docs, embeddings = retrieve_embeddings_from_db(pdf_id)
                 if docs and embeddings:
                     relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                    text_response = generate_responses(user_question, relevant_docs, client)
+                    text_response = generate_responses(user_question, relevant_docs, completion_client)
                     if text_response:
                         st.write("Response:")
                         st.write(text_response)
