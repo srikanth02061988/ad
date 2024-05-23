@@ -1,51 +1,201 @@
+import streamlit as st
+from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import psycopg2
+from psycopg2.extras import execute_values
+import numpy as np
+import logging
+import os
 import requests
 import json
-import os
+import uuid
+from openai import AzureOpenAI
 
-# Set up Azure OpenAI credentials
-azure_endpoint = os.getenv("EFF_OAI_BASE", "")
-azure_api_key = os.getenv("EFF_OAI_KEY", "")
-completion_deployment = "ajitTest"  # Completions deployment
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Define headers for Azure OpenAI API requests
+client = AzureOpenAI(
+    api_version="2024-02-01",
+    azure_endpoint="https://effeopenai.openai.azure.com/",
+    api_key="789c56d537d4f19803a4ac85bd9bc9c9"
+)
+
+azure_endpoint = "https://effeopenai.openai.azure.com/"
+azure_api_key = "53f22d3479e66376534a6c58b9d9e50b"
+embedding_deployment = "rab-robin"
+completion_deployment = "ajitTest"
+
 headers = {
     "Content-Type": "application/json",
     "api-key": azure_api_key
 }
 
-def generate_completion(prompt, endpoint, headers, deployment):
+def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
     try:
-        url = f"{endpoint}/openai/deployments/{deployment}/completions?api-version=2023-09-15-preview"
-        data = {
-            "prompt": prompt,
-            "max_tokens": 50  # Adjust this based on your requirements
-        }
-        
-        print(f"Request URL: {url}")
-        print(f"Request Headers: {headers}")
-        print(f"Request Payload: {json.dumps(data)}")
-        
+        logger.info(f"Generating embeddings for the text chunk: {text[:30]}...")
+        url = f"{endpoint}/openai/deployments/{deployment}/embeddings?api-version=2024-02-15-preview"
+        data = {"input": text}
         response = requests.post(url, headers=headers, json=data)
-        
-        print(f"Response Status Code: {response.status_code}")
-        print(f"Response Content: {response.content}")
-        
         response.raise_for_status()
-        
         result = response.json()
-        text_response = result['choices'][0]['text'].strip()
-        
-        print(f"Response from OpenAI: {text_response}")
-        
-        return text_response
+        embedding = result['data'][0]['embedding']
+        logger.info("Embeddings generated successfully.")
+        return embedding
     except requests.exceptions.RequestException as e:
-        print(f"Error generating completion: {e}")
+        logger.error(f"Error generating embeddings: {e}")
+        st.error("An error occurred while generating embeddings.")
         return None
 
-if __name__ == "__main__":
-    prompt = "Tell me a joke."
-    response = generate_completion(prompt, azure_endpoint, headers, completion_deployment)
-    if response:
-        print("Generated Text:", response)
-    else:
-        print("Failed to generate text.")
+def get_pdf_text(pdf_docs):
+    text = ""
+    try:
+        logger.info("Extracting text from PDF...")
+        reader = PdfReader(pdf_docs)
+        for page in reader.pages:
+            text += page.extract_text()
+        logger.info("Text extraction from PDF successful.")
+    except Exception as e:
+        logger.error(f"Error extracting text from PDF: {e}")
+        st.error("An error occurred while extracting text from PDF.")
+    return text
+
+def get_text_chunks(text):
+    logger.info("Splitting text into chunks...")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
+    chunks = text_splitter.split_text(text)
+    logger.info(f"Text split into {len(chunks)} chunks.")
+    return chunks
+
+def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
+    try:
+        logger.info("Connecting to PostgreSQL database...")
+        conn = psycopg2.connect(
+            host="npecf.fpgaj.postgres.database.azure.com",
+            port="5432",
+            database="Digital_marketing_Embeddings",
+            user="pgadmin",
+            password="npecfER8$"
+        )
+        with conn.cursor() as cur:
+            logger.info("Creating table if it does not exist...")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS embeddings (
+                    id BIGSERIAL PRIMARY KEY,
+                    pdf_id UUID,
+                    content TEXT,
+                    embedding VECTOR(1536)
+                )
+            """)
+            conn.commit()
+
+            embeddings = []
+            for chunk in text_chunks:
+                logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
+                embedding = get_embeddings(chunk, endpoint, headers)
+                if embedding is not None:
+                    embedding_vector = list(map(float, embedding))
+                    embeddings.append((pdf_id, chunk, embedding_vector))
+                else:
+                    logger.error("Failed to generate embedding for a chunk, skipping it.")
+            
+            if embeddings:
+                with conn.cursor() as cur:
+                    logger.info("Inserting embeddings into the database...")
+                    execute_values(
+                        cur,
+                        "INSERT INTO embeddings (pdf_id, content, embedding) VALUES %s",
+                        embeddings
+                    )
+                    conn.commit()
+                    logger.info("Embeddings stored in the database successfully.")
+            else:
+                logger.error("No embeddings generated to store in the database.")
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error storing embeddings in database: {e}")
+        st.error("An error occurred while storing embeddings in the database.")
+
+def retrieve_embeddings_from_db(pdf_id):
+    try:
+        logger.info("Connecting to PostgreSQL database for retrieval...")
+        conn = psycopg2.connect(
+            host="npecf.fpgaj.postgres.database.azure.com",
+            port="5432",
+            database="Digital_marketing_Embeddings",
+            user="pgadmin",
+            password="npecfER8$"
+        )
+        with conn.cursor() as cur:
+            logger.info(f"Retrieving embeddings for PDF ID: {pdf_id}...")
+            cur.execute("SELECT content, embedding FROM embeddings WHERE pdf_id = %s", (pdf_id,))
+            rows = cur.fetchall()
+        conn.close()
+
+        if rows:
+            embeddings = [row[1] for row in rows]
+            docs = [row[0] for row in rows]
+            embedding_matrix = np.array([list(map(float, emb.split(','))) for emb in embeddings], dtype=np.float32)
+            return docs, embedding_matrix
+        else:
+            logger.error("No embeddings found for the given PDF ID.")
+            st.error("No embeddings found for the given PDF ID.")
+            return None, None
+    except Exception as e:
+        logger.error(f"Error retrieving embeddings from database: {e}")
+        st.error("An error occurred while retrieving embeddings from the database.")
+        return None, None
+
+def find_relevant_chunks(question, docs, embeddings, top_k=5):
+    # Implementing similarity search logic
+    pass
+
+def generate_responses(question, relevant_docs, endpoint, headers, deployment="ajitTest"):
+    try:
+        logger.info("Generating response for the question...")
+        combined_docs = "\n\n".join(relevant_docs)
+        prompt = f"Based on the following documents, answer the question: {question}\n\nDocuments:\n\n{combined_docs}"
+        
+        response = client.chat.completions.create(
+            model=deployment,
+            messages=[
+                {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        text_response = response.choices[0].message.content
+        logger.info("Response generated successfully.")
+        return text_response
+    except Exception as e:
+        logger.error(f"Error generating responses: {e}")
+        st.error("An error occurred while generating responses.")
+        return None
+
+def main():
+    st.set_page_config(page_title="Digital Marketing", page_icon=":memo:")
+    st.header("Generate Derivative Content")
+    st.sidebar.title("Menu")
+    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files and Click on the submit and process", type=["pdf"])
+    if st.sidebar.button("Submit & Process"):
+        if pdf_docs is not None:
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                if raw_text:
+                    text_chunks = get_text_chunks(raw_text)
+                    pdf_id = str(uuid.uuid4())
+                    store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+                    st.session_state['pdf_id'] = pdf_id
+                else:
+                    st.error("No text extracted from PDF.")
+        else:
+            st.error("Failed to extract text from the uploaded PDF.")
+    
+    if 'pdf_id' in st.session_state:
+        pdf_id = st.session_state['pdf_id']
+        category = st.sidebar.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
+        user_question = st.text_input("Ask a Question based on the uploaded PDF")
+        if st.button("Submit Question"):
+            with st.spinner("Retrieving and processing..."):
+                docs, embeddings = retrieve_embeddings_from_db(pdf_id)
+                if docs and embeddings:
+                    relevant_docs = find_relevant_chunks(user_question, docs, embeddings
