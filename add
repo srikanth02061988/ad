@@ -10,6 +10,7 @@ import requests
 import json
 import uuid
 from openai import AzureOpenAI
+from sklearn.metrics.pairwise import cosine_similarity
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -132,10 +133,9 @@ def retrieve_embeddings_from_db(pdf_id):
         conn.close()
 
         if rows:
-            embeddings = [row[1] for row in rows]
             docs = [row[0] for row in rows]
-            embedding_matrix = np.array([list(map(float, emb.split(','))) for emb in embeddings], dtype=np.float32)
-            return docs, embedding_matrix
+            embeddings = np.array([row[1] for row in rows], dtype=np.float32)
+            return docs, embeddings
         else:
             logger.error("No embeddings found for the given PDF ID.")
             st.error("No embeddings found for the given PDF ID.")
@@ -146,8 +146,21 @@ def retrieve_embeddings_from_db(pdf_id):
         return None, None
 
 def find_relevant_chunks(question, docs, embeddings, top_k=5):
-    # Implementing similarity search logic
-    pass
+    try:
+        question_embedding = get_embeddings(question, azure_endpoint, headers)
+        if question_embedding is None:
+            return []
+        
+        question_embedding = np.array(question_embedding).reshape(1, -1)
+        similarities = cosine_similarity(question_embedding, embeddings)
+        relevant_indices = np.argsort(similarities[0])[::-1][:top_k]
+        relevant_docs = [docs[i] for i in relevant_indices]
+        
+        return relevant_docs
+    except Exception as e:
+        logger.error(f"Error finding relevant chunks: {e}")
+        st.error("An error occurred while finding relevant chunks.")
+        return []
 
 def generate_responses(question, relevant_docs, endpoint, headers, deployment="ajitTest"):
     try:
@@ -198,4 +211,19 @@ def main():
             with st.spinner("Retrieving and processing..."):
                 docs, embeddings = retrieve_embeddings_from_db(pdf_id)
                 if docs and embeddings:
-                    relevant_docs = find_relevant_chunks(user_question, docs, embeddings
+                    relevant_docs = find_relevant_chunks(user_question, docs, embeddings, top_k=5)
+                    if relevant_docs:
+                        text_response = generate_responses(user_question, relevant_docs, azure_endpoint, headers)
+                        if text_response:
+                            st.write("Response:")
+                            st.write(text_response)
+                            st.download_button('Download Response', data=text_response, file_name='response.txt')
+                        else:
+                            st.error("Failed to generate responses.")
+                    else:
+                        st.error("No relevant embeddings found for the uploaded PDF.")
+                else:
+                    st.error("Failed to retrieve embeddings from the database.")
+
+if __name__ == "__main__":
+    main()
