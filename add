@@ -9,6 +9,10 @@ import requests
 import json
 import uuid
 from openai import AzureOpenAI
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import base64
 
 client = AzureOpenAI(
     api_version="2024-02-01",
@@ -16,7 +20,7 @@ client = AzureOpenAI(
     api_key="7896c56d537df41980034ac85b9d9bc9"
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levellevelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 azure_endpoint = "https://effopenai.openai.azure.com"
@@ -122,49 +126,81 @@ def retrieve_embeddings_from_db(pdf_id):
 def find_relevant_chunks(question, docs, embeddings, top_k=5):
     return docs[:top_k]
 
-def generate_responses(question, relevant_docs, client, deployment="ajitTest"):
+def generate_responses(question, relevant_docs, client, deployment="ajitTest", num_responses=3):
     try:
         combined_docs = "\n\n".join(relevant_docs)
         prompt = f"Based on the following documents, answer the question: {question}\n\nDocuments:\n\n{combined_docs}"
 
-        response = client.chat.completions.create(
-            model=deployment,
-            messages=[
-                {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-
-        result = response.model_dump_json(indent=2)
-        text_response = response.choices[0].message.content.strip()
-        return text_response
+        responses = []
+        for _ in range(num_responses):
+            response = client.chat.completions.create(
+                model=deployment,
+                messages=[
+                    {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            text_response = response.choices[0].message.content.strip()
+            responses.append(text_response)
+        return responses
     except Exception as e:
         st.error(f"An error occurred while generating responses: {e}")
-        return None
+        return []
+
+def create_pdf(text_response):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    p.drawString(100, 750, text_response)
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return buffer
+
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
 
 def main():
     st.set_page_config(page_title="Digital Marketing")
+
+    header_image = get_base64_image("path_to_your_logo.png")
+    footer_image = get_base64_image("path_to_your_copyright.png")
     
-    # Header and Footer
-    st.markdown("""
+    st.markdown(f"""
         <style>
-        .header, .footer {
+        .header, .footer {{
             width: 100%;
             text-align: center;
             padding: 10px;
-        }
-        .header {
+        }}
+        .header {{
             background-color: #f8f9fa;
-        }
-        .footer {
+        }}
+        .footer {{
             background-color: #f1f1f1;
             position: fixed;
             bottom: 0;
             width: 100%;
-        }
+        }}
+        .response-container {{
+            display: flex;
+            justify-content: space-around;
+        }}
+        .response {{
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px;
+            flex: 1;
+            text-align: center;
+        }}
+        .thumbs-up {{
+            cursor: pointer;
+            color: green;
+            font-size: 24px;
+        }}
         </style>
         <div class="header">
-            <img src="https://example.com/logo.png" alt="Logo" style="width:150px;">
+            <img src="data:image/png;base64,{header_image}" alt="Logo" style="width:150px;">
         </div>
     """, unsafe_allow_html=True)
 
@@ -195,11 +231,27 @@ def main():
                     prompts = json.load(file)
                 system_prompt = prompts.get(category, "Default prompt")
                 text_chunks = st.session_state.get("text_chunks", [])
-                text_response = generate_responses(system_prompt, text_chunks, client)
-                if text_response:
-                    st.write("Response:")
-                    st.write(text_response)
-                    st.download_button("Download Response", data=text_response, file_name="response.txt")
+                responses = generate_responses(system_prompt, text_chunks, client)
+                if responses:
+                    st.write("Responses:")
+                    st.session_state["responses"] = responses
+                    st.session_state["selected_response"] = None
+                    for i, response in enumerate(responses):
+                        col = st.columns(len(responses))[i]
+                        with col:
+                            st.markdown(f'<div class="response">{response}</div>', unsafe_allow_html=True)
+                            if st.button("👍", key=f"thumbs_up_{i}"):
+                                st.session_state["selected_response"] = response
+                    if st.session_state["selected_response"]:
+                        st.write("Selected Response:")
+                        st.write(st.session_state["selected_response"])
+                        pdf_buffer = create_pdf(st.session_state["selected_response"])
+                        st.download_button(
+                            "Download Selected Response as PDF",
+                            data=pdf_buffer,
+                            file_name="response.pdf",
+                            mime="application/pdf"
+                        )
                 else:
                     st.error("Failed to generate responses.")
             if st.button("Next"):
@@ -216,11 +268,27 @@ def main():
                     docs, embeddings = retrieve_embeddings_from_db(pdf_id)
                     if docs and embeddings is not None and embeddings.any():
                         relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                        text_response = generate_responses(user_question, relevant_docs, client)
-                        if text_response:
-                            st.write("Response:")
-                            st.write(text_response)
-                            st.download_button("Download Response", data=text_response, file_name="response.txt")
+                        responses = generate_responses(user_question, relevant_docs, client)
+                        if responses:
+                            st.write("Responses:")
+                            st.session_state["responses"] = responses
+                            st.session_state["selected_response"] = None
+                            for i, response in enumerate(responses):
+                                col = st.columns(len(responses))[i]
+                                with col:
+                                    st.markdown(f'<div class="response">{response}</div>', unsafe_allow_html=True)
+                                    if st.button("👍", key=f"thumbs_up_{i}"):
+                                        st.session_state["selected_response"] = response
+                            if st.session_state["selected_response"]:
+                                st.write("Selected Response:")
+                                st.write(st.session_state["selected_response"])
+                                pdf_buffer = create_pdf(st.session_state["selected_response"])
+                                st.download_button(
+                                    "Download Selected Response as PDF",
+                                    data=pdf_buffer,
+                                    file_name="response.pdf",
+                                    mime="application/pdf"
+                                )
                         else:
                             st.error("Failed to generate responses.")
                     else:
@@ -228,9 +296,9 @@ def main():
         else:
             st.warning("Please upload and process a PDF in the 'Upload & Generate' tab first.")
 
-    st.markdown("""
+    st.markdown(f"""
         <div class="footer">
-            <img src="https://example.com/copyright.png" alt="Copyright" style="width:100px;">
+            <img src="data:image/png;base64,{footer_image}" alt="Copyright" style="width:100px;">
         </div>
     """, unsafe_allow_html=True)
 
