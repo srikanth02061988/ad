@@ -16,7 +16,7 @@ client = AzureOpenAI(
     api_key="7896c56d537df41980034ac85b9d9bc9"
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levellevelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 azure_endpoint = "https://effopenai.openai.azure.com"
@@ -179,24 +179,22 @@ def main():
     st.header("Generate Derivative Content")
     st.sidebar.title("Menu")
 
-    tabs = ["Upload & Generate", "Ask Questions"]
-    selected_tab = st.sidebar.radio("Select Tab", tabs)
-    
-    if selected_tab == "Upload & Generate":
-        st.subheader("Upload & Generate")
-        pdf_docs = st.file_uploader("Upload your PDF Files", type=["pdf"])
+    tab1, tab2 = st.tabs(["Upload & Generate", "Ask Questions"])
 
-        if pdf_docs is not None:
-            if st.button("Submit PDF"):
-                with st.spinner("Processing..."):
-                    raw_text = get_pdf_text(pdf_docs)
-                    if raw_text:
-                        text_chunks = get_text_chunks(raw_text)
-                        pdf_id = str(uuid.uuid4())
-                        store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
-                        st.session_state["pdf_id"] = pdf_id
-                        st.session_state["text_chunks"] = text_chunks
-                        st.sidebar.success("PDF processed and embeddings stored.")
+    with tab1:
+        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
+
+        if pdf_docs is not None and st.sidebar.button("Submit PDF"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                if raw_text:
+                    text_chunks = get_text_chunks(raw_text)
+                    pdf_id = str(uuid.uuid4())
+                    store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+                    st.session_state["pdf_id"] = pdf_id
+                    st.session_state["text_chunks"] = text_chunks
+                    st.session_state["category"] = None
+                    st.sidebar.success("PDF processed and embeddings stored.")
 
         if "pdf_id" in st.session_state:
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
@@ -214,10 +212,9 @@ def main():
                     st.error("Failed to generate responses.")
             if st.button("Next"):
                 st.session_state["category"] = category
-                st.sidebar.success("Category selected. Proceed to the 'Ask Questions' tab.")
-    
-    elif selected_tab == "Ask Questions":
-        st.subheader("Ask Questions")
+                st.experimental_rerun()
+
+    with tab2:
         if "pdf_id" in st.session_state:
             category = st.session_state.get("category", "Other")
             user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200)
@@ -241,4 +238,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
