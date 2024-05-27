@@ -242,25 +242,23 @@ def main():
                 text_chunks = st.session_state.get("text_chunks", [])
                 responses = generate_responses(system_prompt, text_chunks, client)
                 if responses:
-                    st.write("Responses:")
                     st.session_state["responses"] = responses
 
-                    selected_response = st.radio("Select a response to download:", responses)
-                    st.session_state.selected_response = selected_response
+    if st.session_state["responses"]:
+        st.write("Responses:")
+        selected_response = st.radio("Select a response to download:", st.session_state["responses"])
+        st.session_state.selected_response = selected_response
                     
-                    if st.session_state.selected_response:
-                        st.write("Selected Response:")
-                        st.write(st.session_state.selected_response)
-                        pdf_buffer = create_pdf(st.session_state.selected_response)
-                        st.download_button(
-                            "Download Selected Response as PDF",
-                            data=pdf_buffer,
-                            file_name="response.pdf",
-                            mime="application/pdf"
-                        )
-                else:
-                    logger.error("Failed to generate responses.")
-                    st.error("Failed to generate responses.")
+        if st.session_state.selected_response:
+            st.write("Selected Response:")
+            st.write(st.session_state.selected_response)
+            pdf_buffer = create_pdf(st.session_state.selected_response)
+            st.download_button(
+                "Download Selected Response as PDF",
+                data=pdf_buffer,
+                file_name="response.pdf",
+                mime="application/pdf"
+            )
 
     with tab2:
         if "pdf_id" in st.session_state:
@@ -274,11 +272,9 @@ def main():
                         relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
                         responses = generate_responses(user_question, relevant_docs, client)
                         if responses:
-                            st.write("Responses:")
                             st.session_state["responses"] = responses
-                            st.session_state["selected_response"] = None
 
-                            selected_response = st.radio("Select a response to download:", responses)
+                            selected_response = st.radio("Select a response to download:", st.session_state["responses"])
                             st.session_state.selected_response = selected_response
 
                             if st.session_state.selected_response:
