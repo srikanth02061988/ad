@@ -1,32 +1,29 @@
 import streamlit as st
-import pdfplumber
+from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import psycopg2
 from psycopg2.extras import execute_values
 import numpy as np
+import os
 import logging
 import requests
 import json
 import uuid
 from openai import AzureOpenAI
-from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+import io
 
-# Initialize logging
+# Initialize the Azure OpenAI client
+client = AzureOpenAI(
+    api_version="2024-02-01",
+    azure_endpoint="https://effopenai.openai.azure.com/",
+    api_key="7896c56d537df41980034ac85b9d9bc9"
+)
+
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Azure OpenAI client initialization
-try:
-    client = AzureOpenAI(
-        api_version="2024-02-01",
-        azure_endpoint="https://effopenai.openai.azure.com/",
-        api_key="7896c56d537df41980034ac85b9d9bc9"
-    )
-    logger.info("Azure OpenAI client initialized successfully.")
-except Exception as e:
-    logger.error(f"Failed to initialize Azure OpenAI client: {e}")
 
 # Azure and database configuration
 azure_endpoint = "https://effopenai.openai.azure.com"
@@ -39,11 +36,28 @@ headers = {
     "api-key": azure_api_key
 }
 
+def create_pdf(content):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    c.drawString(100, 750, "Generated Response")
+    text = c.beginText(40, 720)
+    text.setFont("Times-Roman", 12)
+    for line in content.split('\n'):
+        text.textLine(line)
+    c.drawText(text)
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+# Function to generate embeddings
 def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
     try:
-        logger.info("Generating embeddings...")
+        logger.info(f"Generating embeddings for the text chunk: {text[:30]}...")
         url = f"{endpoint.strip()}/openai/deployments/{deployment}/embeddings?api-version=2024-02-15-preview"
+        logger.info(f"Request URL: {url}")
+        logger.info(f"Request Headers: {headers}")
         data = {"input": text}
+        logger.info(f"Request Data: {data}")
         response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
         result = response.json()
@@ -51,25 +65,28 @@ def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
         logger.info("Embeddings generated successfully.")
         return embedding
     except requests.exceptions.RequestException as e:
-        logger.error(f"An error occurred while generating embeddings: {e}")
+        logger.error(f"Error generating embeddings: {e}")
         st.error(f"An error occurred while generating embeddings: {e}")
         return None
 
+# Function to extract text from PDF
 def get_pdf_text(pdf_docs):
     text = ""
     try:
-        with pdfplumber.open(pdf_docs) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    cleaned_text = page_text.replace('\x00', '')
-                    text += cleaned_text
-        logger.info("Text extracted from PDF successfully.")
+        logger.info("Extracting text from PDF...")
+        reader = PdfReader(pdf_docs)
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                cleaned_text = page_text.replace('\x00', '')
+                text += cleaned_text
+        logger.info("Text extraction from PDF successful.")
     except Exception as e:
-        logger.error(f"An error occurred while extracting text from PDF: {e}")
+        logger.error(f"Error extracting text from PDF: {e}")
         st.error(f"An error occurred while extracting text from PDF: {e}")
     return text
 
+# Function to split text into chunks
 def get_text_chunks(text):
     logger.info("Splitting text into chunks...")
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
@@ -77,6 +94,7 @@ def get_text_chunks(text):
     logger.info(f"Text split into {len(chunks)} chunks.")
     return chunks
 
+# Function to store embeddings in the database
 def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
     try:
         logger.info("Connecting to PostgreSQL database...")
@@ -87,7 +105,9 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
             user="pgadmin",
             password="npceeff8kS"
         )
+
         with conn.cursor() as cur:
+            logger.info("Creating table if it does not exist...")
             cur.execute("""
             CREATE TABLE IF NOT EXISTS embeddings (
                 id BIGSERIAL PRIMARY KEY,
@@ -97,30 +117,34 @@ def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
             )
             """)
             conn.commit()
-            logger.info("Table checked/created successfully.")
 
         embeddings = []
         for chunk in text_chunks:
+            logger.info(f"Generating embedding for chunk: {chunk[:30]}...")
             embedding = get_embeddings(chunk, endpoint, headers)
             if embedding is not None:
-                embedding_vector = np.array(embedding, dtype=np.float32)
-                embeddings.append((pdf_id, chunk, embedding_vector.tolist()))
+                embedding_vector = list(map(float, embedding))
+                embeddings.append((pdf_id, chunk, embedding_vector))
             else:
-                logger.warning("Embedding generation returned None.")
-
+                logger.error("Failed to generate embedding for a chunk, skipping it.")
+        
         if embeddings:
             with conn.cursor() as cur:
+                logger.info("Inserting embeddings into the database...")
                 execute_values(cur, "INSERT INTO embeddings (pdf_id, content, embedding) VALUES %s", embeddings)
                 conn.commit()
-            logger.info("Embeddings stored in the database successfully.")
+        else:
+            logger.error("No embeddings generated to store in the database.")
+
         conn.close()
     except Exception as e:
-        logger.error(f"An error occurred while storing embeddings in the database: {e}")
+        logger.error(f"Error storing embeddings in database: {e}")
         st.error(f"An error occurred while storing embeddings in the database: {e}")
 
+# Function to retrieve embeddings from the database
 def retrieve_embeddings_from_db(pdf_id):
     try:
-        logger.info("Retrieving embeddings from the database...")
+        logger.info("Connecting to PostgreSQL database for retrieval...")
         conn = psycopg2.connect(
             host="npceffepsql.postgres.database.azure.com",
             port="5432",
@@ -128,71 +152,63 @@ def retrieve_embeddings_from_db(pdf_id):
             user="pgadmin",
             password="npceeff8kS"
         )
+
         with conn.cursor() as cur:
+            logger.info(f"Retrieving embeddings for PDF ID: {pdf_id}...")
             cur.execute("SELECT content, embedding::text FROM embeddings WHERE pdf_id = %s", (pdf_id,))
             rows = cur.fetchall()
         conn.close()
 
         if rows:
             docs = [row[0] for row in rows]
-            embeddings = np.array([np.fromstring(row[1][1:-1], sep=',') for row in rows], dtype=np.float32)
-            logger.info("Embeddings retrieved successfully.")
+            embeddings = np.array([list(map(float, row[1][1:-1].split(','))) for row in rows], dtype=np.float32)
             return docs, embeddings
         else:
-            logger.warning("No embeddings found for the given PDF ID.")
+            logger.info("No embeddings found for the given PDF ID.")
             return None, None
     except Exception as e:
-        logger.error(f"An error occurred while retrieving embeddings from the database: {e}")
+        logger.error(f"Error retrieving embeddings from database: {e}")
         st.error(f"An error occurred while retrieving embeddings from the database: {e}")
         return None, None
 
+# Function to find relevant chunks
 def find_relevant_chunks(question, docs, embeddings, top_k=5):
+    # Dummy implementation for finding relevant chunks
     return docs[:top_k]
 
-def generate_responses(question, relevant_docs, client, deployment="ajitTest", num_responses=3):
+# Function to generate responses using AzureOpenAI client
+def generate_responses(question, relevant_docs, client, deployment="ajitTest"):
     try:
+        logger.info("Generating responses for the question...")
         combined_docs = "\n\n".join(relevant_docs)
         prompt = f"Based on the following documents, answer the question: {question}\n\nDocuments:\n\n{combined_docs}"
 
-        responses = []
-        for _ in range(num_responses):
-            response = client.chat.completions.create(
-                model=deployment,
-                messages=[
-                    {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            text_response = response.choices[0].message.content.strip()
-            responses.append(text_response)
-        logger.info("Responses generated successfully.")
-        return responses
-    except Exception as e:
-        logger.error(f"An error occurred while generating responses: {e}")
-        st.error(f"An error occurred while generating responses: {e}")
-        return []
+        response = client.chat.completions.create(
+            model=deployment,
+            messages=[
+                {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
+                {"role": "user", "content": prompt}
+            ]
+        )
 
-def create_pdf(text_response):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    p.drawString(100, 750, text_response)
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return buffer
+        result = response.model_dump_json(indent=2)
+        text_responses = [choice['message']['content'].strip() for choice in response.choices]
+        logger.info(f"Response from OpenAI: {text_responses}")
+
+        return text_responses
+    except Exception as e:
+        logger.error(f"Error generating responses: {e}")
+        st.error(f"An error occurred while generating responses: {e}")
+        return None
 
 def main():
-    logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Derived content uc generator app")
-
     st.header("Derived content uc generator app")
     st.sidebar.title("Menu")
-
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
     with tab1:
-        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
-
+        pdf_docs = st.sidebar.file_uploader("Upload your PDF files", type=["pdf"])
         if pdf_docs is not None and st.sidebar.button("Submit PDF"):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
@@ -205,46 +221,46 @@ def main():
                     st.session_state["category"] = None
                     st.sidebar.success("PDF processed and embeddings stored.")
                 else:
-                    logger.warning("No text extracted from PDF.")
+                    logger.error("No text extracted from PDF.")
                     st.error("Failed to extract text from the uploaded PDF.")
+            if st.button("Next"):
+                st.experimental_rerun()
 
         if "pdf_id" in st.session_state:
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
             if st.button("Submit"):
-                with open("prompts.json", "r") as file:
-                    try:
+                with st.spinner("Retrieving and processing..."):
+                    with open("prompts.json") as file:
                         prompts = json.load(file)
-                        logger.info("Prompts loaded successfully.")
-                    except json.JSONDecodeError:
-                        logger.error("Error loading prompts from JSON.")
-                        st.error("Error loading prompts. Please check the prompts.json file.")
-                        return
-                system_prompt = prompts.get(category, "Default prompt")
-                text_chunks = st.session_state.get("text_chunks", [])
-                responses = generate_responses(system_prompt, text_chunks, client)
-                if responses:
-                    st.write("Responses:")
-                    st.session_state["responses"] = responses
-                    st.session_state["selected_response"] = None
-                    response_cols = st.columns(len(responses))
-                    for i, response in enumerate(responses):
-                        with response_cols[i]:
-                            st.markdown(f'<div class="response">{response}</div>', unsafe_allow_html=True)
-                            if st.button("👍", key=f"thumbs_up_{i}"):
-                                st.session_state["selected_response"] = response
-                    if st.session_state["selected_response"]:
-                        st.write("Selected Response:")
-                        st.write(st.session_state["selected_response"])
-                        pdf_buffer = create_pdf(st.session_state["selected_response"])
-                        st.download_button(
-                            "Download Selected Response as PDF",
-                            data=pdf_buffer,
-                            file_name="response.pdf",
-                            mime="application/pdf"
+                    system_prompt = prompts.get(category, "Default prompt")
+                    text_chunks = st.session_state.get("text_chunks", [])
+                    responses = generate_responses(system_prompt, text_chunks, client)
+                    if responses:
+                        st.write("Responses:")
+                        for response in responses:
+                            st.markdown(f'<div class="response-container"><div class="response">{response}</div><div class="thumbs-up" onclick="selectResponse(\'{response}\')">👍</div></div>', unsafe_allow_html=True)
+                        st.markdown(
+                            """
+                            <script>
+                            function selectResponse(response) {
+                                fetch('/select-response', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ response: response }),
+                                }).then(response => {
+                                    if (response.ok) {
+                                        alert('Response selected for download');
+                                    }
+                                });
+                            }
+                            </script>
+                            """,
+                            unsafe_allow_html=True,
                         )
-                else:
-                    logger.error("Failed to generate responses.")
-                    st.error("Failed to generate responses.")
+                    else:
+                        st.error("Failed to generate responses.")
 
     with tab2:
         if "pdf_id" in st.session_state:
@@ -256,334 +272,41 @@ def main():
                     docs, embeddings = retrieve_embeddings_from_db(pdf_id)
                     if docs and embeddings is not None and embeddings.any():
                         relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                        responses = generate_responses(user_question, relevant_docs, client)
-                        if responses:
-                            st.write("Responses:")
-                            st.session_state["responses"] = responses
-                            st.session_state["selected_response"] = None
-                            response_cols = st.columns(len(responses))
-                            for i, response in enumerate(responses):
-                                with response_cols[i]:
-                                    st.markdown(f'<div class="response">{response}</div>', unsafe_allow_html=True)
-                                    if st.button("👍", key=f"thumbs_up_{i}"):
-                                        st.session_state["selected_response"] = response
-                            if st.session_state["selected_response"]:
-                                st.write("Selected Response:")
-                                st.write(st.session_state["selected_response"])
-                                pdf_buffer = create_pdf(st.session_state["selected_response"])
-                                st.download_button(
-                                    "Download Selected Response as PDF",
-                                    data=pdf_buffer,
-                                    file_name="response.pdf",
-                                    mime="application/pdf"
-                                )
+                        text_responses = generate_responses(user_question, relevant_docs, client)
+                        if text_responses:
+                            st.write("Response:")
+                            for response in text_responses:
+                                st.markdown(f'<div class="response-container"><div class="response">{response}</div><div class="thumbs-up" onclick="selectResponse(\'{response}\')">👍</div></div>', unsafe_allow_html=True)
+                            st.markdown(
+                                """
+                                <script>
+                                function selectResponse(response) {
+                                    fetch('/select-response', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({ response: response }),
+                                    }).then(response => {
+                                        if (response.ok) {
+                                            alert('Response selected for download');
+                                        }
+                                    });
+                                }
+                                </script>
+                                """,
+                                unsafe_allow_html=True,
+                            )
                         else:
-                            logger.error("Failed to generate responses.")
                             st.error("Failed to generate responses.")
                     else:
-                        logger.warning("No relevant embeddings found for the uploaded PDF.")
                         st.error("No relevant embeddings found for the uploaded PDF.")
         else:
             st.warning("Please upload and process a PDF in the 'Upload & Generate' tab first.")
 
-if __name__ == "__main__":
-    main()
-
-
-
-
-
-
-
-
-
-import streamlit as st
-import pdfplumber
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-import psycopg2
-from psycopg2.extras import execute_values
-import numpy as np
-import logging
-import requests
-import json
-import uuid
-from openai import AzureOpenAI
-from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-
-# Initialize logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Azure OpenAI client initialization
-try:
-    client = AzureOpenAI(
-        api_version="2024-02-01",
-        azure_endpoint="https://effopenai.openai.azure.com/",
-        api_key="7896c56d537df41980034ac85b9d9bc9"
-    )
-    logger.info("Azure OpenAI client initialized successfully.")
-except Exception as e:
-    logger.error(f"Failed to initialize Azure OpenAI client: {e}")
-
-# Azure and database configuration
-azure_endpoint = "https://effopenai.openai.azure.com"
-azure_api_key = "7896c56d537df41980034ac85b9d9bc9"
-embedding_deployment = "TEB-Robin"
-completion_deployment = "ajitTest"
-
-headers = {
-    "Content-Type": "application/json",
-    "api-key": azure_api_key
-}
-
-def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
-    try:
-        logger.info("Generating embeddings...")
-        url = f"{endpoint.strip()}/openai/deployments/{deployment}/embeddings?api-version=2024-02-15-preview"
-        data = {"input": text}
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
-        result = response.json()
-        embedding = result['data'][0]['embedding']
-        logger.info("Embeddings generated successfully.")
-        return embedding
-    except requests.exceptions.RequestException as e:
-        logger.error(f"An error occurred while generating embeddings: {e}")
-        st.error(f"An error occurred while generating embeddings: {e}")
-        return None
-
-def get_pdf_text(pdf_docs):
-    text = ""
-    try:
-        with pdfplumber.open(pdf_docs) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    cleaned_text = page_text.replace('\x00', '')
-                    text += cleaned_text
-        logger.info("Text extracted from PDF successfully.")
-    except Exception as e:
-        logger.error(f"An error occurred while extracting text from PDF: {e}")
-        st.error(f"An error occurred while extracting text from PDF: {e}")
-    return text
-
-def get_text_chunks(text):
-    logger.info("Splitting text into chunks...")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
-    chunks = text_splitter.split_text(text)
-    logger.info(f"Text split into {len(chunks)} chunks.")
-    return chunks
-
-def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
-    try:
-        logger.info("Connecting to PostgreSQL database...")
-        conn = psycopg2.connect(
-            host="npceffepsql.postgres.database.azure.com",
-            port="5432",
-            database="Digital_marketing_Embeddings",
-            user="pgadmin",
-            password="npceeff8kS"
-        )
-        with conn.cursor() as cur:
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS embeddings (
-                id BIGSERIAL PRIMARY KEY,
-                pdf_id UUID,
-                content TEXT,
-                embedding VECTOR(1536)
-            )
-            """)
-            conn.commit()
-            logger.info("Table checked/created successfully.")
-
-        embeddings = []
-        for chunk in text_chunks:
-            embedding = get_embeddings(chunk, endpoint, headers)
-            if embedding is not None:
-                embedding_vector = np.array(embedding, dtype=np.float32)
-                embeddings.append((pdf_id, chunk, embedding_vector.tolist()))
-            else:
-                logger.warning("Embedding generation returned None.")
-
-        if embeddings:
-            with conn.cursor() as cur:
-                execute_values(cur, "INSERT INTO embeddings (pdf_id, content, embedding) VALUES %s", embeddings)
-                conn.commit()
-            logger.info("Embeddings stored in the database successfully.")
-        conn.close()
-    except Exception as e:
-        logger.error(f"An error occurred while storing embeddings in the database: {e}")
-        st.error(f"An error occurred while storing embeddings in the database: {e}")
-
-def retrieve_embeddings_from_db(pdf_id):
-    try:
-        logger.info("Retrieving embeddings from the database...")
-        conn = psycopg2.connect(
-            host="npceffepsql.postgres.database.azure.com",
-            port="5432",
-            database="Digital_marketing_Embeddings",
-            user="pgadmin",
-            password="npceeff8kS"
-        )
-        with conn.cursor() as cur:
-            cur.execute("SELECT content, embedding::text FROM embeddings WHERE pdf_id = %s", (pdf_id,))
-            rows = cur.fetchall()
-        conn.close()
-
-        if rows:
-            docs = [row[0] for row in rows]
-            embeddings = np.array([np.fromstring(row[1][1:-1], sep=',') for row in rows], dtype=np.float32)
-            logger.info("Embeddings retrieved successfully.")
-            return docs, embeddings
-        else:
-            logger.warning("No embeddings found for the given PDF ID.")
-            return None, None
-    except Exception as e:
-        logger.error(f"An error occurred while retrieving embeddings from the database: {e}")
-        st.error(f"An error occurred while retrieving embeddings from the database: {e}")
-        return None, None
-
-def find_relevant_chunks(question, docs, embeddings, top_k=5):
-    return docs[:top_k]
-
-def generate_responses(question, relevant_docs, client, deployment="ajitTest", num_responses=3):
-    try:
-        combined_docs = "\n\n".join(relevant_docs)
-        prompt = f"Based on the following documents, answer the question: {question}\n\nDocuments:\n\n{combined_docs}"
-
-        responses = []
-        for _ in range(num_responses):
-            response = client.chat.completions.create(
-                model=deployment,
-                messages=[
-                    {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            text_response = response.choices[0].message.content.strip()
-            responses.append(text_response)
-        logger.info("Responses generated successfully.")
-        return responses
-    except Exception as e:
-        logger.error(f"An error occurred while generating responses: {e}")
-        st.error(f"An error occurred while generating responses: {e}")
-        return []
-
-def create_pdf(text_response):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    p.drawString(100, 750, text_response)
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return buffer
-
-def main():
-    logger.info("Setting up the Streamlit page...")
-    st.set_page_config(page_title="Derived content uc generator app")
-
-    st.header("Derived content uc generator app")
-    st.sidebar.title("Menu")
-
-    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
-
-    with tab1:
-        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
-
-        if pdf_docs is not None and st.sidebar.button("Submit PDF"):
-            with st.spinner("Processing..."):
-                raw_text = get_pdf_text(pdf_docs)
-                if raw_text:
-                    text_chunks = get_text_chunks(raw_text)
-                    pdf_id = str(uuid.uuid4())
-                    store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
-                    st.session_state["pdf_id"] = pdf_id
-                    st.session_state["text_chunks"] = text_chunks
-                    st.session_state["category"] = None
-                    st.sidebar.success("PDF processed and embeddings stored.")
-                else:
-                    logger.warning("No text extracted from PDF.")
-                    st.error("Failed to extract text from the uploaded PDF.")
-
-        if "pdf_id" in st.session_state:
-            category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
-            if st.button("Submit"):
-                with open("prompts.json", "r") as file:
-                    try:
-                        prompts = json.load(file)
-                        logger.info("Prompts loaded successfully.")
-                    except json.JSONDecodeError:
-                        logger.error("Error loading prompts from JSON.")
-                        st.error("Error loading prompts. Please check the prompts.json file.")
-                        return
-                system_prompt = prompts.get(category, "Default prompt")
-                text_chunks = st.session_state.get("text_chunks", [])
-                responses = generate_responses(system_prompt, text_chunks, client)
-                if responses:
-                    st.write("Responses:")
-                    st.session_state["responses"] = responses
-                    st.session_state["selected_response"] = None
-                    response_cols = st.columns(len(responses))
-                    for i, response in enumerate(responses):
-                        with response_cols[i]:
-                            st.markdown(f'<div class="response">{response}</div>', unsafe_allow_html=True)
-                            if st.button("👍", key=f"thumbs_up_{i}"):
-                                st.session_state["selected_response"] = response
-                    if st.session_state["selected_response"]:
-                        st.write("Selected Response:")
-                        st.write(st.session_state["selected_response"])
-                        pdf_buffer = create_pdf(st.session_state["selected_response"])
-                        st.download_button(
-                            "Download Selected Response as PDF",
-                            data=pdf_buffer,
-                            file_name="response.pdf",
-                            mime="application/pdf"
-                        )
-                else:
-                    logger.error("Failed to generate responses.")
-                    st.error("Failed to generate responses.")
-
-    with tab2:
-        if "pdf_id" in st.session_state:
-            category = st.session_state.get("category", "Other")
-            user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200)
-            if st.button("Submit Question"):
-                with st.spinner("Retrieving and processing..."):
-                    pdf_id = st.session_state["pdf_id"]
-                    docs, embeddings = retrieve_embeddings_from_db(pdf_id)
-                    if docs and embeddings is not None and embeddings.any():
-                        relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                        responses = generate_responses(user_question, relevant_docs, client)
-                        if responses:
-                            st.write("Responses:")
-                            st.session_state["responses"] = responses
-                            st.session_state["selected_response"] = None
-                            response_cols = st.columns(len(responses))
-                            for i, response in enumerate(responses):
-                                with response_cols[i]:
-                                    st.markdown(f'<div class="response">{response}</div>', unsafe_allow_html=True)
-                                    if st.button("👍", key=f"thumbs_up_{i}"):
-                                        st.session_state["selected_response"] = response
-                            if st.session_state["selected_response"]:
-                                st.write("Selected Response:")
-                                st.write(st.session_state["selected_response"])
-                                pdf_buffer = create_pdf(st.session_state["selected_response"])
-                                st.download_button(
-                                    "Download Selected Response as PDF",
-                                    data=pdf_buffer,
-                                    file_name="response.pdf",
-                                    mime="application/pdf"
-                                )
-                        else:
-                            logger.error("Failed to generate responses.")
-                            st.error("Failed to generate responses.")
-                    else:
-                        logger.warning("No relevant embeddings found for the uploaded PDF.")
-                        st.error("No relevant embeddings found for the uploaded PDF.")
-        else:
-            st.warning("Please upload and process a PDF in the 'Upload & Generate' tab first.")
+    if st.session_state.get("selected_response"):
+        buffer = create_pdf(st.session_state["selected_response"])
+        st.download_button("Download Response", data=buffer, file_name="response.pdf")
 
 if __name__ == "__main__":
     main()
