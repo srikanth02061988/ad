@@ -12,6 +12,7 @@ from openai import AzureOpenAI
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -175,15 +176,17 @@ def generate_responses(question, relevant_docs, client, deployment="ajitTest", n
 def create_pdf(text_response):
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
-
-    text_object = p.beginText(40, 750)
-    text_object.setTextOrigin(40, 750)
-    text_object.setFont("Helvetica", 12)
     
+    text_object = p.beginText(40, 750)
+    text_object.setFont("Helvetica", 12)
+    text_object.setTextOrigin(40, 750)
+    max_width = 7.5 * inch
     lines = text_response.split('\n')
     for line in lines:
-        for subline in line.split('\n'):
-            text_object.textLine(subline)
+        while len(line) > 0:
+            part = line[:int(max_width / 6)]
+            text_object.textLine(part)
+            line = line[int(max_width / 6):]
     
     p.drawText(text_object)
     p.showPage()
@@ -242,7 +245,8 @@ def main():
                     st.write("Responses:")
                     st.session_state["responses"] = responses
 
-                    st.session_state.selected_response = st.radio("Select a response to download:", responses)
+                    selected_response = st.radio("Select a response to download:", responses)
+                    st.session_state.selected_response = selected_response
                     
                     if st.session_state.selected_response:
                         st.write("Selected Response:")
@@ -274,7 +278,8 @@ def main():
                             st.session_state["responses"] = responses
                             st.session_state["selected_response"] = None
 
-                            st.session_state.selected_response = st.radio("Select a response to download:", responses)
+                            selected_response = st.radio("Select a response to download:", responses)
+                            st.session_state.selected_response = selected_response
 
                             if st.session_state.selected_response:
                                 st.write("Selected Response:")
