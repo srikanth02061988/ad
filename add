@@ -175,7 +175,15 @@ def generate_responses(question, relevant_docs, client, deployment="ajitTest", n
 def create_pdf(text_response):
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
-    p.drawString(100, 750, text_response)
+    
+    # Add line wrapping to handle long text
+    lines = text_response.split('\n')
+    text_object = p.beginText(40, 750)
+    for line in lines:
+        for subline in line.split('\n'):
+            text_object.textLine(subline)
+    
+    p.drawText(text_object)
     p.showPage()
     p.save()
     buffer.seek(0)
@@ -189,6 +197,12 @@ def main():
     st.sidebar.title("Menu")
 
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
+
+    if "responses" not in st.session_state:
+        st.session_state.responses = []
+    
+    if "selected_response" not in st.session_state:
+        st.session_state.selected_response = None
 
     with tab1:
         pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
@@ -225,15 +239,13 @@ def main():
                 if responses:
                     st.write("Responses:")
                     st.session_state["responses"] = responses
-                    st.session_state["selected_response"] = None
 
-                    selected_response = st.radio("Select a response to download:", responses)
-                    st.session_state["selected_response"] = selected_response
+                    st.session_state.selected_response = st.radio("Select a response to download:", responses)
                     
-                    if st.session_state["selected_response"]:
+                    if st.session_state.selected_response:
                         st.write("Selected Response:")
-                        st.write(st.session_state["selected_response"])
-                        pdf_buffer = create_pdf(st.session_state["selected_response"])
+                        st.write(st.session_state.selected_response)
+                        pdf_buffer = create_pdf(st.session_state.selected_response)
                         st.download_button(
                             "Download Selected Response as PDF",
                             data=pdf_buffer,
@@ -260,13 +272,12 @@ def main():
                             st.session_state["responses"] = responses
                             st.session_state["selected_response"] = None
 
-                            selected_response = st.radio("Select a response to download:", responses)
-                            st.session_state["selected_response"] = selected_response
+                            st.session_state.selected_response = st.radio("Select a response to download:", responses)
 
-                            if st.session_state["selected_response"]:
+                            if st.session_state.selected_response:
                                 st.write("Selected Response:")
-                                st.write(st.session_state["selected_response"])
-                                pdf_buffer = create_pdf(st.session_state["selected_response"])
+                                st.write(st.session_state.selected_response)
+                                pdf_buffer = create_pdf(st.session_state.selected_response)
                                 st.download_button(
                                     "Download Selected Response as PDF",
                                     data=pdf_buffer,
