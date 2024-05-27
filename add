@@ -10,10 +10,6 @@ import requests
 import json
 import uuid
 from openai import AzureOpenAI
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-import io
-import base64
 
 client = AzureOpenAI(
     api_version="2024-02-01",
@@ -47,7 +43,9 @@ def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
         result = response.json()
         embedding = result['data'][0]['embedding']
         logger.info("Embeddings generated successfully.")
+        
         print("Generated Embeddings:", embedding)
+        
         return embedding
     except requests.exceptions.RequestException as e:
         logger.error(f"Error generating embeddings: {e}")
@@ -62,7 +60,7 @@ def get_pdf_text(pdf_docs):
         for page in reader.pages:
             page_text = page.extract_text()
             if page_text:
-                cleaned_text = page_text.replace('\x00', '')
+                cleaned_text = page_text.replace('\x00', '')  # Remove null characters
                 text += cleaned_text
         logger.info("Text extraction from PDF successful.")
     except Exception as e:
@@ -143,7 +141,9 @@ def retrieve_embeddings_from_db(pdf_id):
         if rows:
             docs = [row[0] for row in rows]
             embeddings = np.array([list(map(float, row[1][1:-1].split(','))) for row in rows], dtype=np.float32)
+            
             print("Retrieved Embeddings:", embeddings)
+            
             return docs, embeddings
         else:
             logger.info("No embeddings found for the given PDF ID.")
@@ -154,96 +154,72 @@ def retrieve_embeddings_from_db(pdf_id):
         return None, None
 
 def find_relevant_chunks(question, docs, embeddings, top_k=5):
-    # Implementation for finding relevant chunks
     return docs[:top_k]
 
-def generate_responses(prompt, relevant_docs, client, deployment="ajitTest"):
+def generate_responses(question, relevant_docs, client, deployment="ajitTest"):
     try:
         logger.info("Generating responses for the question...")
         combined_docs = "\n\n".join(relevant_docs)
-        full_prompt = f"{prompt}\n\nDocuments:\n\n{combined_docs}"
-        response = client.chat_completions.create(
-            model=deployment,
-            messages=[
-                {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
-                {"role": "user", "content": full_prompt}
-            ]
+        prompt = f"Based on the following documents, answer the question: {question}\n\nDocuments:\n\n{combined_docs}"
+
+        response = client.completions.create(
+            engine=deployment,
+            prompt=prompt,
+            max_tokens=150
         )
-        text_responses = [choice.message['content'].strip() for choice in response.choices]
-        logger.info(f"Response from OpenAI: {text_responses}")
-        return text_responses
+
+        result = response['choices'][0]['text'].strip()
+        logger.info(f"Response from OpenAI: {result}")
+
+        return result
     except Exception as e:
         logger.error(f"Error generating responses: {e}")
         st.error(f"An error occurred while generating responses: {e}")
         return None
 
-def create_pdf(content):
-    buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    pdf.setFont("Helvetica", 12)
-    pdf.drawString(30, 750, content)
-    pdf.save()
-    buffer.seek(0)
-    return buffer
-
 def main():
     st.set_page_config(page_title="Derived content uc generator app")
     st.header("Derived content uc generator app")
-    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
+    st.sidebar.title("Menu")
 
-    with tab1:
-        pdf_docs = st.file_uploader("Upload your PDF Files", type=["pdf"])
-        if pdf_docs and st.button("Submit PDF"):
-            with st.spinner("Processing..."):
-                raw_text = get_pdf_text(pdf_docs)
-                if raw_text:
-                    text_chunks = get_text_chunks(raw_text)
-                    pdf_id = str(uuid.uuid4())
-                    store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
-                    st.session_state["pdf_id"] = pdf_id
-                    st.session_state["text_chunks"] = text_chunks
-                    st.sidebar.success("PDF processed and embeddings stored.")
-                else:
-                    logger.error("No text extracted from PDF.")
-                    st.error("Failed to extract text from the uploaded PDF.")
+    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
+    
+    if pdf_docs is not None and st.sidebar.button("Submit and Process"):
+        with st.spinner("Processing..."):
+            raw_text = get_pdf_text(pdf_docs)
+            if raw_text:
+                text_chunks = get_text_chunks(raw_text)
+                pdf_id = str(uuid.uuid4())
+                store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+                st.session_state["pdf_id"] = pdf_id
+                st.session_state["text_chunks"] = text_chunks
+                st.sidebar.success("PDF processed and embeddings stored.")
+            else:
+                logger.error("No text extracted from PDF.")
+                st.error("Failed to extract text from the uploaded PDF.")
 
-    with tab2:
-        if "pdf_id" in st.session_state:
-            category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
-            if st.button("Next"):
-                st.session_state["category"] = category
-                st.experimental_rerun()
-            if "category" in st.session_state:
-                with open("prompts.json") as file:
-                    prompts = json.load(file)
-                system_prompt = prompts.get(category, "Default prompt")
-                text_chunks = st.session_state.get("text_chunks", [])
-                responses = generate_responses(system_prompt, text_chunks, client)
-                if responses:
-                    st.write("Responses:")
-                    for response in responses:
-                        st.markdown(f'<div class="response-container"><div class="response">{response}</div><div class="thumbs-up" onclick="selectResponse(\'{response}\')">👍</div></div>', unsafe_allow_html=True)
-                    st.markdown(
-                        """
-                        <script>
-                        function selectResponse(response) {
-                            fetch('/select-response', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({response: response}),
-                            }).then(response => response.json()).then(data => {
-                                console.log('Response selected:', data);
-                                window.location.href = '/download-response';
-                            });
-                        }
-                        </script>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.error("Failed to generate responses.")
+    if "pdf_id" in st.session_state:
+        category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
+        if st.button("Next"):
+            st.session_state["category"] = category
+            st.experimental_rerun()
+
+    if "category" in st.session_state:
+        category = st.session_state["category"]
+        if category:
+            with open("prompts.json") as file:
+                prompts = json.load(file)
+            system_prompt = prompts.get(category, "Default prompt")
+            text_chunks = st.session_state.get("text_chunks", [])
+            if st.button("Submit"):
+                with st.spinner("Generating responses..."):
+                    text_response = generate_responses(system_prompt, text_chunks, client)
+                    if text_response:
+                        st.write("Response:")
+                        st.write(text_response)
+                        st.download_button("Download Response", data=text_response, file_name="response.txt")
+                    else:
+                        st.error("Failed to generate responses.")
 
     st.experimental_rerun()
 
