@@ -173,13 +173,19 @@ def generate_responses(question, relevant_docs, client, deployment="ajitTest", n
         st.error(f"An error occurred while generating responses: {e}")
         return []
 
-def create_pdf(text_response):
+def create_pdf(text_response, header_image_url, footer_text):
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     
-    text_object = p.beginText(40, 750)
+    # Draw header image
+    if header_image_url:
+        header_image = requests.get(header_image_url)
+        header_image_bytes = BytesIO(header_image.content)
+        p.drawImage(header_image_bytes, 40, 720, width=inch*6, height=inch)
+    
+    # Draw text response
+    text_object = p.beginText(40, 700)
     text_object.setFont("Helvetica", 12)
-    text_object.setTextOrigin(40, 750)
     max_width = 7.5 * inch
     lines = text_response.split('\n')
     for line in lines:
@@ -187,8 +193,15 @@ def create_pdf(text_response):
             part = line[:int(max_width / 6)]
             text_object.textLine(part)
             line = line[int(max_width / 6):]
-    
     p.drawText(text_object)
+
+    # Draw footer text
+    text_object = p.beginText(40, 40)
+    text_object.setFont("Helvetica", 8)
+    for line in footer_text.split('\n'):
+        text_object.textLine(line)
+    p.drawText(text_object)
+
     p.showPage()
     p.save()
     buffer.seek(0)
@@ -221,10 +234,15 @@ def main():
     if "selected_response_tab2" not in st.session_state:
         st.session_state.selected_response_tab2 = None
 
-    with tab1:
-        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_uploader_tab1")
+    header_image_url = "https://your-image-url.com/header.png"
+    footer_text = ("This website is intended for the user’s own use in reviewing information available here about State Street Corporation and its affiliates (“State Street”). By accessing this website, you agree to be bound by the terms and conditions that appear herein. These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website. If you do not agree with these terms and conditions, please do not access the website.\n"
+                   "© 2024 State Street Corporation. All rights reserved.\n"
+                   "Global Privacy Notice | Cookie Settings | Cookie Disclosure | Legal | Sitemap")
 
-        if pdf_docs is not None and st.sidebar.button("Submit PDF", key="submit_pdf_tab1"):
+    with tab1:
+        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
+
+        if pdf_docs is not None and st.sidebar.button("Submit PDF"):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
                 if raw_text:
@@ -263,7 +281,7 @@ def main():
         if st.session_state.selected_response_tab1:
             st.write("Selected Response:")
             st.write(st.session_state.selected_response_tab1)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab1)
+            pdf_buffer = create_pdf(st.session_state.selected_response_tab1, header_image_url, footer_text)
             st.download_button(
                 "Download Selected Response as PDF",
                 data=pdf_buffer,
@@ -293,7 +311,7 @@ def main():
         if st.session_state.selected_response_tab2:
             st.write("Selected Response:")
             st.write(st.session_state.selected_response_tab2)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab2)
+            pdf_buffer = create_pdf(st.session_state.selected_response_tab2, header_image_url, footer_text)
             st.download_button(
                 "Download Selected Response as PDF",
                 data=pdf_buffer,
