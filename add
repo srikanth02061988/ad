@@ -203,12 +203,6 @@ def main():
 
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
-    if "responses" not in st.session_state:
-        st.session_state.responses = []
-    
-    if "selected_response" not in st.session_state:
-        st.session_state.selected_response = None
-
     if "responses_tab1" not in st.session_state:
         st.session_state.responses_tab1 = []
 
