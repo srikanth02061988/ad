@@ -54,7 +54,7 @@ def get_pdf_text(pdf_docs):
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
-                    cleaned_text = page_text.replace('\x00', '')
+                    cleaned_text = page_text.encode('utf-8', errors='ignore').decode('utf-8')
                     text += cleaned_text
     except Exception as e:
         st.error(f"An error occurred while extracting text from PDF: {e}")
@@ -226,7 +226,11 @@ def main():
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"])
             if st.button("Submit"):
                 with open("prompts.json", "r") as file:
-                    prompts = json.load(file)
+                    try:
+                        prompts = json.load(file)
+                    except json.JSONDecodeError:
+                        st.error("Error loading prompts. Please check the prompts.json file.")
+                        return
                 system_prompt = prompts.get(category, "Default prompt")
                 text_chunks = st.session_state.get("text_chunks", [])
                 responses = generate_responses(system_prompt, text_chunks, client)
@@ -252,9 +256,6 @@ def main():
                         )
                 else:
                     st.error("Failed to generate responses.")
-            if st.button("Next"):
-                st.session_state["category"] = category
-                st.experimental_rerun()
 
     with tab2:
         if "pdf_id" in st.session_state:
