@@ -304,17 +304,6 @@ def main():
     st.markdown(f"""
         <div class="footer">
             <img src="data:image/png;base64,{footer_image}" alt="Footer Image" style="width:100px;">
-            <p>&copy; 2023 Your Company Name. All rights reserved.</p>
-            <p>Contact us at <a href="mailto:contact@yourcompany.com">contact@yourcompany.com</a></p>
-            <p>
-                <a href="https://www.yourcompany.com/privacy-policy" target="_blank">Privacy Policy</a> |
-                <a href="https://www.yourcompany.com/terms-of-service" target="_blank">Terms of Service</a>
-            </p>
-            <p>
-                <a href="https://twitter.com/yourcompany" target="_blank">Twitter</a> |
-                <a href="https://facebook.com/yourcompany" target="_blank">Facebook</a> |
-                <a href="https://linkedin.com/company/yourcompany" target="_blank">LinkedIn</a>
-            </p>
         </div>
     """, unsafe_allow_html=True)
 
