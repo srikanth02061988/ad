@@ -62,7 +62,7 @@ def get_pdf_text(pdf_docs):
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
-                    cleaned_text = page_text.encode('utf-8', errors='ignore').decode('utf-8')
+                    cleaned_text = page_text.replace('\x00', '')
                     text += cleaned_text
         logger.info("Text extracted from PDF successfully.")
     except Exception as e:
