@@ -175,10 +175,12 @@ def generate_responses(question, relevant_docs, client, deployment="ajitTest", n
 def create_pdf(text_response):
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
-    
-    # Add line wrapping to handle long text
-    lines = text_response.split('\n')
+
     text_object = p.beginText(40, 750)
+    text_object.setTextOrigin(40, 750)
+    text_object.setFont("Helvetica", 12)
+    
+    lines = text_response.split('\n')
     for line in lines:
         for subline in line.split('\n'):
             text_object.textLine(subline)
