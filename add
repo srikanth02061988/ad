@@ -13,9 +13,8 @@ from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from htbuilder import HtmlElement, div, ul, li, br, hr, a, p, img, styles, classes, fonts
+from htbuilder import HtmlElement, div, br, hr, a, p, styles
 from htbuilder.units import percent, px
-from htbuilder.funcs import rgba, rgb
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -209,7 +208,7 @@ def layout(*args):
     <style>
       #MainMenu {visibility: hidden;}
       footer {visibility: hidden;}
-     .stApp { bottom: 105px; }
+     .stApp { padding-bottom: 150px; }
     </style>
     """
 
@@ -255,7 +254,7 @@ def layout(*args):
 
 def footer():
     myargs = [
-        "© 2024 State Street Corporation. All rights reserved.",
+        "2024 State Street Corporation. All rights reserved.",
         br(),
         "By accessing this website, you agree to be bound by the terms and conditions that appear herein.",
         br(),
@@ -282,7 +281,7 @@ def main():
     # Add header image and application name
     header_image_url = "https://your-image-url.com/header.png"  # Update this URL to your header image
     st.markdown(f"""
-    <div style='display: flex; align-items: center;'>
+    <div style='display: flex; align-items: center; margin-bottom: 10px;'>
         <img src='{header_image_url}' style='width: 50px; margin-right: 10px;'>
         <h1 style='margin: 0; font-size: 24px;'>Derived content uc generator app</h1>
     </div>
@@ -395,4 +394,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
