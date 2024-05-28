@@ -173,20 +173,10 @@ def generate_responses(question, relevant_docs, client, deployment="ajitTest", n
         st.error(f"An error occurred while generating responses: {e}")
         return []
 
-def create_pdf(text_response, header_image_url, footer_text):
+def create_pdf(text_response):
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     
-    # Draw header image
-    if header_image_url:
-        try:
-            header_image = requests.get(header_image_url)
-            header_image_bytes = BytesIO(header_image.content)
-            p.drawImage(header_image_bytes, 40, 750, width=inch*6, height=inch)
-            logger.info("Header image drawn successfully.")
-        except Exception as e:
-            logger.error(f"Error fetching header image: {e}")
-
     # Draw text response
     text_object = p.beginText(40, 700)
     text_object.setFont("Helvetica", 12)
@@ -198,16 +188,6 @@ def create_pdf(text_response, header_image_url, footer_text):
             text_object.textLine(part)
             line = line[int(max_width / 6):]
     p.drawText(text_object)
-    logger.info("Text response drawn successfully.")
-
-    # Draw footer text
-    text_object = p.beginText(40, 30)  # Adjust position to ensure it's visible
-    text_object.setFont("Helvetica", 8)
-    simplified_footer_text = footer_text.encode('ascii', 'ignore').decode('ascii')  # Remove non-ascii characters
-    for line in simplified_footer_text.split('\n'):
-        text_object.textLine(line)
-    p.drawText(text_object)
-    logger.info("Footer text drawn successfully.")
 
     p.showPage()
     p.save()
@@ -217,6 +197,10 @@ def create_pdf(text_response, header_image_url, footer_text):
 def main():
     logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Derived content uc generator app")
+
+    # Add header image
+    header_image_url = "https://your-image-url.com/header.png"
+    st.image(header_image_url, use_column_width=True)
 
     st.header("Derived content uc generator app")
     st.sidebar.title("Menu")
@@ -240,10 +224,6 @@ def main():
 
     if "selected_response_tab2" not in st.session_state:
         st.session_state.selected_response_tab2 = None
-
-    header_image_url = "https://your-image-url.com/header.png"
-    footer_text = ("This is the footer text. It contains information about the document.\n"
-                   "© 2024 Your Company. All rights reserved.\n")
 
     with tab1:
         pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
@@ -287,7 +267,7 @@ def main():
         if st.session_state.selected_response_tab1:
             st.write("Selected Response:")
             st.write(st.session_state.selected_response_tab1)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab1, header_image_url, footer_text)
+            pdf_buffer = create_pdf(st.session_state.selected_response_tab1)
             st.download_button(
                 "Download Selected Response as PDF",
                 data=pdf_buffer,
@@ -317,7 +297,7 @@ def main():
         if st.session_state.selected_response_tab2:
             st.write("Selected Response:")
             st.write(st.session_state.selected_response_tab2)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab2, header_image_url, footer_text)
+            pdf_buffer = create_pdf(st.session_state.selected_response_tab2)
             st.download_button(
                 "Download Selected Response as PDF",
                 data=pdf_buffer,
@@ -325,6 +305,11 @@ def main():
                 mime="application/pdf",
                 key="download_button_tab2"
             )
+
+    # Add footer text
+    footer_text = ("This is the footer text. It contains information about the document.\n"
+                   "© 2024 Your Company. All rights reserved.\n")
+    st.markdown(f"<div style='text-align: center; font-size: small;'>{footer_text}</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
