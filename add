@@ -183,6 +183,7 @@ def create_pdf(text_response, header_image_url, footer_text):
             header_image = requests.get(header_image_url)
             header_image_bytes = BytesIO(header_image.content)
             p.drawImage(header_image_bytes, 40, 750, width=inch*6, height=inch)
+            logger.info("Header image drawn successfully.")
         except Exception as e:
             logger.error(f"Error fetching header image: {e}")
 
@@ -197,14 +198,16 @@ def create_pdf(text_response, header_image_url, footer_text):
             text_object.textLine(part)
             line = line[int(max_width / 6):]
     p.drawText(text_object)
+    logger.info("Text response drawn successfully.")
 
     # Draw footer text
-    text_object = p.beginText(40, 40)
+    text_object = p.beginText(40, 30)  # Adjust position to ensure it's visible
     text_object.setFont("Helvetica", 8)
     simplified_footer_text = footer_text.encode('ascii', 'ignore').decode('ascii')  # Remove non-ascii characters
     for line in simplified_footer_text.split('\n'):
         text_object.textLine(line)
     p.drawText(text_object)
+    logger.info("Footer text drawn successfully.")
 
     p.showPage()
     p.save()
