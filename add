@@ -179,10 +179,13 @@ def create_pdf(text_response, header_image_url, footer_text):
     
     # Draw header image
     if header_image_url:
-        header_image = requests.get(header_image_url)
-        header_image_bytes = BytesIO(header_image.content)
-        p.drawImage(header_image_bytes, 40, 720, width=inch*6, height=inch)
-    
+        try:
+            header_image = requests.get(header_image_url)
+            header_image_bytes = BytesIO(header_image.content)
+            p.drawImage(header_image_bytes, 40, 750, width=inch*6, height=inch)
+        except Exception as e:
+            logger.error(f"Error fetching header image: {e}")
+
     # Draw text response
     text_object = p.beginText(40, 700)
     text_object.setFont("Helvetica", 12)
@@ -236,9 +239,8 @@ def main():
         st.session_state.selected_response_tab2 = None
 
     header_image_url = "https://your-image-url.com/header.png"
-    footer_text = ("This website is intended for the user’s own use in reviewing information available here about State Street Corporation and its affiliates. By accessing this website, you agree to be bound by the terms and conditions that appear herein. These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website. If you do not agree with these terms and conditions, please do not access the website.\n"
-                   "© 2024 State Street Corporation. All rights reserved.\n"
-                   "Global Privacy Notice | Cookie Settings | Cookie Disclosure | Legal | Sitemap")
+    footer_text = ("This is the footer text. It contains information about the document.\n"
+                   "© 2024 Your Company. All rights reserved.\n")
 
     with tab1:
         pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
