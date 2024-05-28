@@ -198,7 +198,8 @@ def create_pdf(text_response, header_image_url, footer_text):
     # Draw footer text
     text_object = p.beginText(40, 40)
     text_object.setFont("Helvetica", 8)
-    for line in footer_text.split('\n'):
+    simplified_footer_text = footer_text.encode('ascii', 'ignore').decode('ascii')  # Remove non-ascii characters
+    for line in simplified_footer_text.split('\n'):
         text_object.textLine(line)
     p.drawText(text_object)
 
@@ -235,7 +236,7 @@ def main():
         st.session_state.selected_response_tab2 = None
 
     header_image_url = "https://your-image-url.com/header.png"
-    footer_text = ("This website is intended for the user’s own use in reviewing information available here about State Street Corporation and its affiliates (“State Street”). By accessing this website, you agree to be bound by the terms and conditions that appear herein. These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website. If you do not agree with these terms and conditions, please do not access the website.\n"
+    footer_text = ("This website is intended for the user’s own use in reviewing information available here about State Street Corporation and its affiliates. By accessing this website, you agree to be bound by the terms and conditions that appear herein. These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website. If you do not agree with these terms and conditions, please do not access the website.\n"
                    "© 2024 State Street Corporation. All rights reserved.\n"
                    "Global Privacy Notice | Cookie Settings | Cookie Disclosure | Legal | Sitemap")
 
