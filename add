@@ -194,6 +194,16 @@ def create_pdf(text_response):
     buffer.seek(0)
     return buffer
 
+def clear_tab1_state():
+    for key in list(st.session_state.keys()):
+        if key.startswith('tab1_'):
+            del st.session_state[key]
+
+def clear_tab2_state():
+    for key in list(st.session_state.keys()):
+        if key.startswith('tab2_'):
+            del st.session_state[key]
+
 def main():
     logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Derived content uc generator app")
@@ -207,104 +217,99 @@ def main():
 
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
-    if "pdf_id" not in st.session_state:
-        st.session_state.pdf_id = None
+    if "current_tab" not in st.session_state:
+        st.session_state.current_tab = "Upload & Generate"
 
-    if "text_chunks" not in st.session_state:
-        st.session_state.text_chunks = []
+    if st.session_state.current_tab != "Upload & Generate":
+        clear_tab1_state()
 
-    if "responses_tab1" not in st.session_state:
-        st.session_state.responses_tab1 = []
+    if st.session_state.current_tab != "Developer Prompt":
+        clear_tab2_state()
 
-    if "responses_tab2" not in st.session_state:
-        st.session_state.responses_tab2 = []
+    st.session_state.current_tab = st.radio("", ["Upload & Generate", "Developer Prompt"], index=0 if st.session_state.current_tab == "Upload & Generate" else 1)
 
-    if "selected_response_tab1" not in st.session_state:
-        st.session_state.selected_response_tab1 = None
+    if st.session_state.current_tab == "Upload & Generate":
+        with tab1:
+            pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="tab1_pdf_upload")
 
-    if "selected_response_tab2" not in st.session_state:
-        st.session_state.selected_response_tab2 = None
+            if pdf_docs is not None and st.sidebar.button("Submit PDF", key="tab1_submit_pdf"):
+                with st.spinner("Processing..."):
+                    raw_text = get_pdf_text(pdf_docs)
+                    if raw_text:
+                        text_chunks = get_text_chunks(raw_text)
+                        pdf_id = str(uuid.uuid4())
+                        store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+                        st.session_state.tab1_pdf_id = pdf_id
+                        st.session_state.tab1_text_chunks = text_chunks
+                        st.sidebar.success("PDF processed and embeddings stored.")
+                    else:
+                        logger.warning("No text extracted from PDF.")
+                        st.error("Failed to extract text from the uploaded PDF.")
 
-    with tab1:
-        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_upload_tab1")
+            if "tab1_pdf_id" in st.session_state:
+                category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"], key="tab1_category")
+                if st.button("Submit", key="tab1_submit"):
+                    with open("prompts.json", "r") as file:
+                        try:
+                            prompts = json.load(file)
+                            logger.info("Prompts loaded successfully.")
+                        except json.JSONDecodeError:
+                            logger.error("Error loading prompts from JSON.")
+                            st.error("Error loading prompts. Please check the prompts.json file.")
+                            return
+                    system_prompt = prompts.get(category, "Default prompt")
+                    text_chunks = st.session_state.get("tab1_text_chunks", [])
+                    responses = generate_responses(system_prompt, text_chunks, client)
+                    if responses:
+                        st.session_state.tab1_responses = responses
 
-        if pdf_docs is not None and st.sidebar.button("Submit PDF", key="submit_pdf_tab1"):
-            with st.spinner("Processing..."):
-                raw_text = get_pdf_text(pdf_docs)
-                if raw_text:
-                    text_chunks = get_text_chunks(raw_text)
-                    pdf_id = str(uuid.uuid4())
-                    store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
-                    st.session_state.pdf_id = pdf_id
-                    st.session_state.text_chunks = text_chunks
-                    st.sidebar.success("PDF processed and embeddings stored.")
-                else:
-                    logger.warning("No text extracted from PDF.")
-                    st.error("Failed to extract text from the uploaded PDF.")
+        if "tab1_responses" in st.session_state:
+            st.write("Responses:")
+            selected_response = st.radio("Select a response to download:", st.session_state.tab1_responses, key="tab1_responses_radio")
+            st.session_state.tab1_selected_response = selected_response
 
-        if st.session_state.pdf_id:
-            category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"], key="category_tab1")
-            if st.button("Submit", key="submit_tab1"):
-                with open("prompts.json", "r") as file:
-                    try:
-                        prompts = json.load(file)
-                        logger.info("Prompts loaded successfully.")
-                    except json.JSONDecodeError:
-                        logger.error("Error loading prompts from JSON.")
-                        st.error("Error loading prompts. Please check the prompts.json file.")
-                        return
-                system_prompt = prompts.get(category, "Default prompt")
-                text_chunks = st.session_state.get("text_chunks", [])
-                responses = generate_responses(system_prompt, text_chunks, client)
-                if responses:
-                    st.session_state.responses_tab1 = responses
+            if st.session_state.tab1_selected_response:
+                st.write("Selected Response:")
+                st.write(st.session_state.tab1_selected_response)
+                pdf_buffer = create_pdf(st.session_state.tab1_selected_response)
+                st.download_button(
+                    "Download Selected Response as PDF",
+                    data=pdf_buffer,
+                    file_name="response_tab1.pdf",
+                    mime="application/pdf",
+                    key="tab1_download_button"
+                )
 
-    if st.session_state.responses_tab1:
-        st.write("Responses:")
-        selected_response = st.radio("Select a response to download:", st.session_state.responses_tab1, key="responses_radio_tab1")
-        st.session_state.selected_response_tab1 = selected_response
+    if st.session_state.current_tab == "Developer Prompt":
+        with tab2:
+            if "tab1_pdf_id" in st.session_state:
+                user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="tab2_question")
+                if st.button("Submit", key="tab2_submit"):
+                    with st.spinner("Retrieving and processing..."):
+                        pdf_id = st.session_state.tab1_pdf_id
+                        docs, embeddings = retrieve_embeddings_from_db(pdf_id)
+                        if docs and embeddings is not None and embeddings.any():
+                            relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
+                            responses = generate_responses(user_question, relevant_docs, client)
+                            if responses:
+                                st.session_state.tab2_responses = responses
 
-        if st.session_state.selected_response_tab1:
-            st.write("Selected Response:")
-            st.write(st.session_state.selected_response_tab1)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab1)
-            st.download_button(
-                "Download Selected Response as PDF",
-                data=pdf_buffer,
-                file_name="response_tab1.pdf",
-                mime="application/pdf",
-                key="download_button_tab1"
-            )
+        if "tab2_responses" in st.session_state:
+            st.write("Responses:")
+            selected_response = st.radio("Select a response to download:", st.session_state.tab2_responses, key="tab2_responses_radio")
+            st.session_state.tab2_selected_response = selected_response
 
-    with tab2:
-        if st.session_state.pdf_id:
-            user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
-            if st.button("Submit", key="submit_tab2"):
-                with st.spinner("Retrieving and processing..."):
-                    pdf_id = st.session_state.pdf_id
-                    docs, embeddings = retrieve_embeddings_from_db(pdf_id)
-                    if docs and embeddings is not None and embeddings.any():
-                        relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                        responses = generate_responses(user_question, relevant_docs, client)
-                        if responses:
-                            st.session_state.responses_tab2 = responses
-
-    if st.session_state.responses_tab2:
-        st.write("Responses:")
-        selected_response = st.radio("Select a response to download:", st.session_state.responses_tab2, key="responses_radio_tab2")
-        st.session_state.selected_response_tab2 = selected_response
-
-        if st.session_state.selected_response_tab2:
-            st.write("Selected Response:")
-            st.write(st.session_state.selected_response_tab2)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab2)
-            st.download_button(
-                "Download Selected Response as PDF",
-                data=pdf_buffer,
-                file_name="response_tab2.pdf",
-                mime="application/pdf",
-                key="download_button_tab2"
-            )
+            if st.session_state.tab2_selected_response:
+                st.write("Selected Response:")
+                st.write(st.session_state.tab2_selected_response)
+                pdf_buffer = create_pdf(st.session_state.tab2_selected_response)
+                st.download_button(
+                    "Download Selected Response as PDF",
+                    data=pdf_buffer,
+                    file_name="response_tab2.pdf",
+                    mime="application/pdf",
+                    key="tab2_download_button"
+                )
 
     # Add footer text
     footer_text = ("This is the footer text. It contains information about the document.\n"
