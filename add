@@ -226,9 +226,9 @@ def main():
         st.session_state.selected_response_tab2 = None
 
     with tab1:
-        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
+        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_upload_tab1")
 
-        if pdf_docs is not None and st.sidebar.button("Submit PDF"):
+        if pdf_docs is not None and st.sidebar.button("Submit PDF", key="submit_pdf_tab1"):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
                 if raw_text:
@@ -259,22 +259,22 @@ def main():
                 if responses:
                     st.session_state.responses_tab1 = responses
 
-    if st.session_state.responses_tab1:
-        st.write("Responses:")
-        selected_response = st.radio("Select a response to download:", st.session_state.responses_tab1, key="responses_radio_tab1")
-        st.session_state.selected_response_tab1 = selected_response
+        if st.session_state.responses_tab1:
+            st.write("Responses:")
+            selected_response = st.radio("Select a response to download:", st.session_state.responses_tab1, key="responses_radio_tab1")
+            st.session_state.selected_response_tab1 = selected_response
 
-        if st.session_state.selected_response_tab1:
-            st.write("Selected Response:")
-            st.write(st.session_state.selected_response_tab1)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab1)
-            st.download_button(
-                "Download Selected Response as PDF",
-                data=pdf_buffer,
-                file_name="response_tab1.pdf",
-                mime="application/pdf",
-                key="download_button_tab1"
-            )
+            if st.session_state.selected_response_tab1:
+                st.write("Selected Response:")
+                st.write(st.session_state.selected_response_tab1)
+                pdf_buffer = create_pdf(st.session_state.selected_response_tab1)
+                st.download_button(
+                    "Download Selected Response as PDF",
+                    data=pdf_buffer,
+                    file_name="response_tab1.pdf",
+                    mime="application/pdf",
+                    key="download_button_tab1"
+                )
 
     with tab2:
         if st.session_state.pdf_id:
@@ -289,22 +289,22 @@ def main():
                         if responses:
                             st.session_state.responses_tab2 = responses
 
-    if st.session_state.responses_tab2:
-        st.write("Responses:")
-        selected_response = st.radio("Select a response to download:", st.session_state.responses_tab2, key="responses_radio_tab2")
-        st.session_state.selected_response_tab2 = selected_response
+        if st.session_state.responses_tab2:
+            st.write("Responses:")
+            selected_response = st.radio("Select a response to download:", st.session_state.responses_tab2, key="responses_radio_tab2")
+            st.session_state.selected_response_tab2 = selected_response
 
-        if st.session_state.selected_response_tab2:
-            st.write("Selected Response:")
-            st.write(st.session_state.selected_response_tab2)
-            pdf_buffer = create_pdf(st.session_state.selected_response_tab2)
-            st.download_button(
-                "Download Selected Response as PDF",
-                data=pdf_buffer,
-                file_name="response_tab2.pdf",
-                mime="application/pdf",
-                key="download_button_tab2"
-            )
+            if st.session_state.selected_response_tab2:
+                st.write("Selected Response:")
+                st.write(st.session_state.selected_response_tab2)
+                pdf_buffer = create_pdf(st.session_state.selected_response_tab2)
+                st.download_button(
+                    "Download Selected Response as PDF",
+                    data=pdf_buffer,
+                    file_name="response_tab2.pdf",
+                    mime="application/pdf",
+                    key="download_button_tab2"
+                )
 
     # Add footer text
     footer_text = ("This is the footer text. It contains information about the document.\n"
