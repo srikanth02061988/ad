@@ -199,7 +199,7 @@ def create_pdf(text_response, header_image_url, footer_text):
     text_object = p.beginText(40, 40)
     text_object.setFont("Helvetica", 8)
     for line in footer_text.split('\n'):
-        text_object.textLine(line.encode('utf-8').decode('utf-8'))
+        text_object.textLine(line)
     p.drawText(text_object)
 
     p.showPage()
