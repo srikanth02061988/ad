@@ -1,35 +1,22 @@
 import streamlit as st
-from htbuilder import HtmlElement, div, hr, p, styles, a, img
+from htbuilder import HtmlElement, div, p, a, img, styles
 from htbuilder.units import percent, px
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
-from io import BytesIO
-import pdfplumber
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from htbuilder.funcs import rgba
+import json
+import uuid
+import requests
 import psycopg2
 from psycopg2.extras import execute_values
 import numpy as np
-import requests
-import json
-import uuid
-from openai import AzureOpenAI
+import logging
+import pdfplumber
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 # Initialize logging
-import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Azure OpenAI client initialization
-try:
-    client = AzureOpenAI(
-        api_version="2024-02-01",
-        azure_endpoint="https://effopenai.openai.azure.com/",
-        api_key="7896c56d537df41980034ac85b9d9bc9"
-    )
-    logger.info("Azure OpenAI client initialized successfully.")
-except Exception as e:
-    logger.error(f"Failed to initialize Azure OpenAI client: {e}")
 
 # Azure and database configuration
 azure_endpoint = "https://effopenai.openai.azure.com"
@@ -74,9 +61,14 @@ def get_pdf_text(pdf_docs):
     return text
 
 def get_text_chunks(text):
-    logger.info("Splitting text into chunks...")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
-    chunks = text_splitter.split_text(text)
+    chunks = []
+    chunk_size = 5000
+    chunk_overlap = 500
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunks.append(text[start:end])
+        start += chunk_size - chunk_overlap
     logger.info(f"Text split into {len(chunks)} chunks.")
     return chunks
 
@@ -197,40 +189,47 @@ def create_pdf(text_response, filename):
     return buffer, filename
 
 def layout(*args):
-    style = """
-    <style>
-      #MainMenu {visibility: hidden;}
-      footer {visibility: hidden;}
-      header {visibility: hidden;}
-      .stApp { margin-top: 50px; }
-    </style>
-    """
-    st.markdown(style, unsafe_allow_html=True)
 
     style_header_div = styles(
         position="fixed",
         top=0,
         left=0,
-        right=0,
-        background_color="rgb(0,32,96)",
+        width=percent(100),
+        height=px(60),
+        background_color=rgba(0, 102, 204, 1),
         color="white",
-        padding_left=px(10),
-        padding_top=px(10),
-        padding_bottom=px(10),
-        z_index=1000,
         text_align="left",
+        padding=px(10),
+        margin_bottom=px(70),
+        z_index=1000
     )
 
     style_footer_div = styles(
-        position="fixed",
-        left=0,
+        position="relative",
         bottom=0,
+        left=0,
         width=percent(100),
-        background_color="rgb(0,32,96)",
+        background_color=rgba(0, 102, 204, 1),
         color="white",
         text_align="center",
-        padding=px(10, 10),
-        z_index=1000,
+        padding=px(10),
+        margin_top=px(70),
+        z_index=1000
+    )
+
+    style_logo_div = styles(
+        display="inline-block",
+        margin_left=px(10),
+        margin_top=px(5)
+    )
+
+    style_title_div = styles(
+        display="inline-block",
+        margin_left=px(20),
+        margin_top=px(5),
+        font_size=px(24),
+        font_weight="bold",
+        color="black"
     )
 
     header = div(
@@ -246,51 +245,47 @@ def layout(*args):
     footer = div(
         style=style_footer_div
     )(
-        hr(style=styles(border_style="solid", border_color="white")),
-        p()("2024 State Street Corporation. All rights reserved."),
-        p()("By accessing this website, you agree to be bound by the terms and conditions that appear herein."),
-        p()("These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website."),
-        p()("If you do not agree with these terms and conditions, please do not access the website."),
-        p()(a(_href="https://privacy.notice", style=styles(color="white"))("Global Privacy Notice"), " | ",
-           a(_href="https://cookie.settings", style=styles(color="white"))("Cookie Settings"), " | ",
-           a(_href="https://cookie.disclosure", style=styles(color="white"))("Cookie Disclosure"), " | ",
-           a(_href="https://legal", style=styles(color="white"))("Legal"), " | ",
-           a(_href="https://sitemap", style=styles(color="white"))("Sitemap"))
+        p("© 2024 State Street Corporation. All rights reserved."),
+        p("By accessing this website, you agree to be bound by the terms and conditions that appear herein. These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website. If you do not agree with these terms and conditions, please do not access the website."),
+        p()(
+            a(_href="#", style=styles(color="white", text_decoration="underline"))("Global Privacy Notice"), " | ",
+            a(_href="#", style=styles(color="white", text_decoration="underline"))("Cookie Settings"), " | ",
+            a(_href="#", style=styles(color="white", text_decoration="underline"))("Cookie Disclosure"), " | ",
+            a(_href="#", style=styles(color="white", text_decoration="underline"))("Legal"), " | ",
+            a(_href="#", style=styles(color="white", text_decoration="underline"))("Sitemap")
+        )
+    )
+
+    logo_div = div(
+        style=style_logo_div
+    )(
+        img(src='https://your-logo-url.com/logo.png', style=styles(width=px(30), height=px(30)))
+    )
+
+    title_div = div(
+        style=style_title_div
+    )(
+        "Digital Marketing Derived Content Generator"
     )
 
     st.markdown(str(header), unsafe_allow_html=True)
+    st.markdown(str(logo_div), unsafe_allow_html=True)
+    st.markdown(str(title_div), unsafe_allow_html=True)
+
+    for arg in args:
+        if isinstance(arg, HtmlElement):
+            st.markdown(str(arg), unsafe_allow_html=True)
+        else:
+            st.markdown(arg)
+
     st.markdown(str(footer), unsafe_allow_html=True)
 
-    # Ensure footer is shown only after all content
-    st.markdown(
-        """
-        <style>
-        .reportview-container .main footer {visibility: hidden;}
-        .reportview-container .main footer::before {
-            content: ' ';
-            display: block;
-            height: 200px;
-        }
-        </style>
-        """, unsafe_allow_html=True
-    )
-
-    body = div()
-    for arg in args:
-        if isinstance(arg, str):
-            body(arg)
-        elif isinstance(arg, HtmlElement):
-            body(arg)
-
-    return body
-
 def main():
+    logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Digital Marketing Derived Content Generator")
-    
-    st.sidebar.title("Menu")
-    st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_upload")
 
-    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
+    st.sidebar.title("Menu")
+    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_upload")
 
     if "pdf_id" not in st.session_state:
         st.session_state.pdf_id = None
@@ -304,15 +299,10 @@ def main():
     if "selected_response" not in st.session_state:
         st.session_state.selected_response = None
 
-    if "current_prompt_file" not in st.session_state:
-        st.session_state.current_prompt_file = "prompts.json"
-
-    layout("")
+    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
     with tab1:
-        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_upload_tab1")
-
-        if pdf_docs and st.sidebar.button("Submit PDF", key="submit_pdf_tab1"):
+        if pdf_docs and st.sidebar.button("Submit PDF"):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
                 if raw_text:
@@ -327,10 +317,10 @@ def main():
                     st.error("Failed to extract text from the uploaded PDF.")
 
         if st.session_state.pdf_id:
-            category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"], key="category_tab1")
-            button_label = "Generate" if not st.session_state.responses else "Regenerate"
-            if st.button(button_label, key="generate_tab1"):
-                with open(st.session_state.current_prompt_file, "r") as file:
+            category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Other"], key="category")
+            button_text = "Generate" if len(st.session_state.responses) == 0 else "Regenerate"
+            if st.button(button_text):
+                with open("prompts.json", "r") as file:
                     try:
                         prompts = json.load(file)
                         logger.info("Prompts loaded successfully.")
@@ -344,35 +334,27 @@ def main():
                 if responses:
                     st.session_state.responses = responses
 
-                    # Cycle through prompt files
-                    if st.session_state.current_prompt_file == "prompts.json":
-                        st.session_state.current_prompt_file = "prompts1.json"
-                    elif st.session_state.current_prompt_file == "prompts1.json":
-                        st.session_state.current_prompt_file = "prompts2.json"
-                    else:
-                        st.session_state.current_prompt_file = "prompts.json"
-
         if st.session_state.responses:
             st.write("Responses:")
-            selected_response = st.radio("Select a response to download:", st.session_state.responses, key="responses_radio_tab1")
+            selected_response = st.radio("Select a response to download:", st.session_state.responses, key="responses_radio")
             st.session_state.selected_response = selected_response
 
             if st.session_state.selected_response:
                 st.write("Selected Response:")
                 st.write(st.session_state.selected_response)
-                pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response, f"{category}.pdf")
+                pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response, category.lower() + ".pdf")
                 st.download_button(
-                    f"Download Selected Response as {category}.pdf",
+                    "Download Selected Response as PDF",
                     data=pdf_buffer,
                     file_name=pdf_filename,
                     mime="application/pdf",
-                    key="download_button_tab1"
+                    key="download_button"
                 )
 
     with tab2:
         if st.session_state.pdf_id:
-            user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
-            if st.button("Submit", key="submit_tab2"):
+            user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question")
+            if st.button("Submit Question"):
                 with st.spinner("Retrieving and processing..."):
                     pdf_id = st.session_state.pdf_id
                     docs, embeddings = retrieve_embeddings_from_db(pdf_id)
@@ -390,15 +372,16 @@ def main():
             if st.session_state.selected_response:
                 st.write("Selected Response:")
                 st.write(st.session_state.selected_response)
-                pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response, f"{category}.pdf")
+                pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response, "response.pdf")
                 st.download_button(
-                    f"Download Selected Response as {category}.pdf",
+                    "Download Selected Response as PDF",
                     data=pdf_buffer,
                     file_name=pdf_filename,
                     mime="application/pdf",
                     key="download_button_tab2"
                 )
 
+    layout()
+
 if __name__ == "__main__":
     main()
-
