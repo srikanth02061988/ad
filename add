@@ -48,7 +48,7 @@ def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
         logger.info("Generating embeddings...")
         url = f"{endpoint.strip()}/openai/deployments/{deployment}/embeddings?api-version=2024-02-15-preview"
         data = {"input": text}
-        response = requests.post(url, headers=headers, json(data))
+        response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
         result = response.json()
         embedding = result['data'][0]['embedding']
@@ -213,8 +213,8 @@ def layout(*args):
       .custom-footer {
           position: fixed;
           bottom: 0;
-          width: calc(100% - 15rem); /* Exclude sidebar width */
-          left: 15rem; /* Align with sidebar */
+          width: calc(100% - 18rem); /* Adjust to ensure it starts after the sidebar */
+          left: 18rem; /* Adjust to align with the end of the sidebar */
           background-color: #002855;
           color: white;
           text-align: center;
@@ -223,8 +223,8 @@ def layout(*args):
       .custom-header {
           position: fixed;
           top: 0;
-          width: calc(100% - 15rem); /* Exclude sidebar width */
-          left: 15rem; /* Align with sidebar */
+          width: calc(100% - 18rem); /* Adjust to ensure it starts after the sidebar */
+          left: 18rem; /* Adjust to align with the end of the sidebar */
           background-color: #002855;
           color: white;
           padding: 10px;
@@ -309,8 +309,8 @@ def header():
             font-size: 20px;
             position: fixed;
             top: 0;
-            width: calc(100% - 15rem); /* Exclude sidebar width */
-            left: 15rem; /* Align with sidebar */
+            width: calc(100% - 18rem); /* Adjust to ensure it starts after the sidebar */
+            left: 18rem; /* Adjust to align with the end of the sidebar */
         }
         .header a {
             color: white;
@@ -437,7 +437,7 @@ def main():
                 with st.spinner("Retrieving and processing..."):
                     pdf_id = st.session_state.pdf_id
                     docs, embeddings = retrieve_embeddings_from_db(pdf_id)
-                    if docs and embeddings is not None and embeddings any():
+                    if docs and embeddings is not None and embeddings.any():
                         relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
                         responses = generate_responses(user_question, relevant_docs, client)
                         if responses:
@@ -464,4 +464,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
