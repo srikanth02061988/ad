@@ -1,1 +1,362 @@
+import streamlit as st
+from htbuilder import HtmlElement, div, p, a, img, styles
+from htbuilder.units import percent, px, inch
+from htbuilder.funcs import rgba
+import json
+import uuid
+import requests
+import psycopg2
+from psycopg2.extras import execute_values
+import numpy as np
+import logging
+import pdfplumber
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
+# Initialize logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Azure and database configuration
+azure_endpoint = "https://effopenai.openai.azure.com"
+azure_api_key = "7896c56d537df41980034ac85b9d9bc9"
+embedding_deployment = "TEB-Robin"
+completion_deployment = "ajitTest"
+
+headers = {
+    "Content-Type": "application/json",
+    "api-key": azure_api_key
+}
+
+# Client initialization
+class AzureOpenAI:
+    def __init__(self, api_key, api_base, deployment_name):
+        self.api_key = api_key
+        self.api_base = api_base
+        self.deployment_name = deployment_name
+
+    def chat_completions(self, model, messages):
+        url = f"{self.api_base}/openai/deployments/{self.deployment_name}/chat/completions?api-version=2024-02-15-preview"
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": self.api_key
+        }
+        data = {
+            "model": model,
+            "messages": messages
+        }
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        return response.json()
+
+client = AzureOpenAI(api_key=azure_api_key, api_base=azure_endpoint, deployment_name=completion_deployment)
+
+def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
+    try:
+        logger.info("Generating embeddings...")
+        url = f"{endpoint.strip()}/openai/deployments/{deployment}/embeddings?api-version=2024-02-15-preview"
+        data = {"input": text}
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        embedding = result['data'][0]['embedding']
+        logger.info("Embeddings generated successfully.")
+        return embedding
+    except requests.exceptions.RequestException as e:
+        logger.error(f"An error occurred while generating embeddings: {e}")
+        st.error(f"An error occurred while generating embeddings: {e}")
+        return None
+
+def get_pdf_text(pdf_docs):
+    text = ""
+    try:
+        with pdfplumber.open(pdf_docs) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    cleaned_text = page_text.replace('\x00', '')
+                    text += cleaned_text
+        logger.info("Text extracted from PDF successfully.")
+    except Exception as e:
+        logger.error(f"An error occurred while extracting text from PDF: {e}")
+        st.error(f"An error occurred while extracting text from PDF: {e}")
+    return text
+
+def get_text_chunks(text):
+    chunks = []
+    chunk_size = 5000
+    chunk_overlap = 500
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunks.append(text[start:end])
+        start += chunk_size - chunk_overlap
+    logger.info(f"Text split into {len(chunks)} chunks.")
+    return chunks
+
+def store_embeddings_in_db(pdf_id, text_chunks, endpoint, headers):
+    try:
+        logger.info("Connecting to PostgreSQL database...")
+        conn = psycopg2.connect(
+            host="npceffepsql.postgres.database.azure.com",
+            port="5432",
+            database="Digital_marketing_Embeddings",
+            user="pgadmin",
+            password="npceeff8kS"
+        )
+        with conn.cursor() as cur:
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS embeddings (
+                id BIGSERIAL PRIMARY KEY,
+                pdf_id UUID,
+                content TEXT,
+                embedding VECTOR(1536)
+            )
+            """)
+            conn.commit()
+            logger.info("Table checked/created successfully.")
+
+        embeddings = []
+        for chunk in text_chunks:
+            embedding = get_embeddings(chunk, endpoint, headers)
+            if embedding is not None:
+                embedding_vector = np.array(embedding, dtype=np.float32)
+                embeddings.append((pdf_id, chunk, embedding_vector.tolist()))
+            else:
+                logger.warning("Embedding generation returned None.")
+
+        if embeddings:
+            with conn.cursor() as cur:
+                execute_values(cur, "INSERT INTO embeddings (pdf_id, content, embedding) VALUES %s", embeddings)
+                conn.commit()
+            logger.info("Embeddings stored in the database successfully.")
+        conn.close()
+    except Exception as e:
+        logger.error(f"An error occurred while storing embeddings in the database: {e}")
+        st.error(f"An error occurred while storing embeddings in the database: {e}")
+
+def retrieve_embeddings_from_db(pdf_id):
+    try:
+        logger.info("Retrieving embeddings from the database...")
+        conn = psycopg2.connect(
+            host="npceffepsql.postgres.database.azure.com",
+            port="5432",
+            database="Digital_marketing_Embeddings",
+            user="pgadmin",
+            password="npceeff8kS"
+        )
+        with conn.cursor() as cur:
+            cur.execute("SELECT content, embedding::text FROM embeddings WHERE pdf_id = %s", (pdf_id,))
+            rows = cur.fetchall()
+        conn.close()
+
+        if rows:
+            docs = [row[0] for row in rows]
+            embeddings = np.array([np.fromstring(row[1][1:-1], sep=',') for row in rows], dtype=np.float32)
+            logger.info("Embeddings retrieved successfully.")
+            return docs, embeddings
+        else:
+            logger.warning("No embeddings found for the given PDF ID.")
+            return None, None
+    except Exception as e:
+        logger.error(f"An error occurred while retrieving embeddings from the database: {e}")
+        st.error(f"An error occurred while retrieving embeddings from the database: {e}")
+        return None, None
+
+def find_relevant_chunks(question, docs, embeddings, top_k=5):
+    return docs[:top_k]
+
+def generate_responses(prompt, relevant_docs, client, deployment="ajitTest", num_responses=3):
+    try:
+        combined_docs = "\n\n".join(relevant_docs)
+        prompt = f"Based on the following documents, answer the question: {prompt}\n\nDocuments:\n\n{combined_docs}"
+
+        responses = []
+        for _ in range(num_responses):
+            response = client.chat_completions(
+                model=deployment,
+                messages=[
+                    {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            text_response = response['choices'][0]['message']['content'].strip()
+            responses.append(text_response)
+        logger.info("Responses generated successfully.")
+        return responses
+    except Exception as e:
+        logger.error(f"An error occurred while generating responses: {e}")
+        st.error(f"An error occurred while generating responses: {e}")
+        return []
+
+def create_pdf(text_response, filename):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Draw text response
+    text_object = p.beginText(40, 700)
+    text_object.setFont("Helvetica", 12)
+    max_width = 7.5 * inch
+    lines = text_response.split('\n')
+    for line in lines:
+        while len(line) > 0:
+            part = line[:int(max_width / 6)]
+            text_object.textLine(part)
+            line = line[int(max_width / 6):]
+    p.drawText(text_object)
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return buffer, filename
+
+def image(src_as_string, **style):
+    return img(src=src_as_string, style=styles(**style))
+
+def link(link, text, **style):
+    return a(_href=link, _target="_blank", style=styles(**style))(text)
+
+def layout(*args):
+
+    style = """
+    <style>
+      #MainMenu {visibility: hidden;}
+      footer {visibility: hidden;}
+     .stApp { bottom: 105px; }
+    </style>
+    """
+
+    style_div = styles(
+        position="fixed",
+        left=px(20),  # Adjusted to not overlap with the sidebar
+        bottom=0,
+        margin=px(0, 0, 0, 0),
+        width=percent(100),
+        color="black",
+        text_align="center",
+        height="auto",
+        opacity=1
+    )
+
+    style_hr = styles(
+        display="block",
+        margin=px(8, 8, "auto", "auto"),
+        border_style="inset",
+        border_width=px(2)
+    )
+
+    body = p()
+    foot = div(
+        style=style_div
+    )(
+        hr(
+            style=style_hr
+        ),
+        body
+    )
+
+    st.markdown(style, unsafe_allow_html=True)
+
+    for arg in args:
+        if isinstance(arg, str):
+            body(arg)
+
+        elif isinstance(arg, HtmlElement):
+            body._children.append(arg)
+
+    st.markdown(str(foot), unsafe_allow_html=True)
+
+def footer():
+    myargs = [
+        "2024 State Street Corporation. All rights reserved.",
+        br(),
+        "By accessing this website, you agree to be bound by the terms and conditions that appear herein.",
+        br(),
+        "These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.",
+        br(),
+        "If you do not agree with these terms and conditions, please do not access the website.",
+        br(),
+        link("https://www.statestreet.com", "Global Privacy Notice"),
+        " | ",
+        link("https://www.statestreet.com", "Cookie Settings"),
+        " | ",
+        link("https://www.statestreet.com", "Cookie Disclosure"),
+        " | ",
+        link("https://www.statestreet.com", "Legal"),
+        " | ",
+        link("https://www.statestreet.com", "Sitemap")
+    ]
+    layout(*myargs)
+
+# Streamlit app logic
+def main():
+    st.set_page_config(page_title="Digital Marketing Derived Content Generator", layout="wide")
+
+    # Header section
+    st.markdown(
+        """
+        <div style="background-color:#002776; padding:10px 0; color:white; text-align:center;">
+            <h2>United States - Asset Manager</h2>
+            <span style="position:absolute; top:10px; right:20px;">
+                <a href="https://www.statestreet.com" style="color:white; margin-right:20px;">Contact Us</a>
+                <a href="https://www.statestreet.com" style="color:white;">Company Websites</a>
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Main content
+    st.image("https://example.com/logo.png", width=200)  # Replace with your logo URL
+    st.title("Digital Marketing Derived Content Generator")
+
+    # File upload and processing
+    uploaded_file = st.file_uploader("Upload your PDF file", type="pdf")
+    if uploaded_file is not None:
+        pdf_id = uuid.uuid4()
+        raw_text = get_pdf_text(uploaded_file)
+        text_chunks = get_text_chunks(raw_text)
+        store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+        st.success("PDF processed and embeddings stored in the database.")
+
+    # Select category and generate responses
+    with open("prompts.json") as f:
+        prompts = json.load(f)
+
+    categories = list(prompts.keys())
+    selected_category = st.selectbox("Select the category to search within:", categories)
+
+    if "generated_text" not in st.session_state:
+        st.session_state.generated_text = ""
+    if "button_clicked" not in st.session_state:
+        st.session_state.button_clicked = False
+
+    button_label = "Generate" if not st.session_state.button_clicked else "Regenerate"
+    if st.button(button_label):
+        st.session_state.button_clicked = True
+        system_prompt = prompts[selected_category]
+        docs, embeddings = retrieve_embeddings_from_db(pdf_id)
+        if docs and embeddings is not None:
+            relevant_docs = find_relevant_chunks(system_prompt, docs, embeddings)
+            responses = generate_responses(system_prompt, relevant_docs, client)
+            st.session_state.generated_text = "\n\n".join(responses)
+            st.write(st.session_state.generated_text)
+
+    # Download generated response as PDF
+    if st.session_state.generated_text:
+        filename = f"{selected_category}.pdf"
+        buffer, filename = create_pdf(st.session_state.generated_text, filename)
+        st.download_button(
+            label="Download Selected Response as PDF",
+            data=buffer,
+            file_name=filename,
+            mime="application/pdf"
+        )
+
+    # Footer section
+    footer()
+
+if __name__ == "__main__":
+    main()
 
