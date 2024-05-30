@@ -1,1 +1,91 @@
+<style>
+body, html {
+    height: 100%;
+    margin: 0;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.header {
+    background-color: #002855;
+    color: white;
+    padding: 20px 100px;
+    text-align: left;
+    font-size: 18px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: 70px;
+    line-height: 30px;
+}
+.header a {
+    color: white;
+    margin-right: 15px;
+}
+.header-right {
+    float: right;
+    margin-top: -10px; /* Adjust if necessary */
+}
+
+.content {
+    flex: 1;
+    padding-top: 80px; /* Adjusted to avoid overlap with header */
+    padding-bottom: 50px; /* Adjusted to avoid overlap with footer */
+}
+
+.footer {
+    background-color: #002855;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    font-size: 14px;
+}
+.footer a {
+    color: white;
+    margin: 0 5px;
+}
+</style>
+
+
+<div class="container">
+    <div class="header">
+        United States - Asset Manager
+        <div class="header-right">
+            <a href="https://www.statestreet.com/contact-us.html">Contact Us</a>
+            <a href="https://www.statestreet.com/company-websites.html">Company Websites</a>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- Your main content goes here -->
+        <!-- Include the Streamlit components and logic here -->
+    </div>
+
+    <div class="footer">
+        <hr style='border: 1px solid white; width: 80%; margin: auto;'>
+        2024 State Street Corporation. All rights reserved.
+        <br>
+        By accessing this website, you agree to be bound by the terms and conditions that appear herein.
+        <br>
+        These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.
+        <br>
+        If you do not agree with these terms and conditions, please do not access the website.
+        <br>
+        <a href="#">Global Privacy Notice</a>
+        |
+        <a href="#">Cookie Settings</a>
+        |
+        <a href="#">Cookie Disclosure</a>
+        |
+        <a href="#">Legal</a>
+        |
+        <a href="#">Sitemap</a>
+    </div>
+</div>
 
