@@ -278,6 +278,8 @@ def main():
                     <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
                 </div>
                 <div style='padding: 10px 0;'>
+                    <div style='padding: 10px 0;'>
+                        <div id="app-content">
         """,
         unsafe_allow_html=True
     )
@@ -395,7 +397,7 @@ def main():
                     key="download_button_tab2"
                 )
 
-    st.markdown("</div></div>", unsafe_allow_html=True)  # Close the main content divs
+    st.markdown("</div></div></div>", unsafe_allow_html=True)  # Close the main content and content wrapper divs
 
     # Add footer at the end
     st.markdown(
@@ -426,4 +428,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
