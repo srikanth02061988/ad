@@ -204,19 +204,19 @@ def main():
         html, body, [class*="css"] {
             height: 100%;
             margin: 0;
+            display: flex;
+            flex-direction: column;
         }
         .footer {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
             background-color: #002855;
             color: white;
             text-align: center;
             padding: 20px 0;  /* Increased padding for better visibility */
+            flex-shrink: 0;
         }
-        .main {
-            min-height: calc(100vh - 160px);  /* Adjust based on your header and footer height */
-            padding-top: 80px;  /* Ensure the main content is not overlapped by the header */
+        .main-content {
+            flex: 1 0 auto;
+            padding-top: 100px;  /* Ensure the main content is not overlapped by the header */
         }
         </style>
         """, unsafe_allow_html=True)
@@ -244,7 +244,7 @@ def main():
     st.sidebar.title("Menu")
 
     # Main content area
-    st.markdown('<div class="main">', unsafe_allow_html=True)
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
