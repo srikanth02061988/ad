@@ -278,8 +278,7 @@ def main():
                     <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
                 </div>
                 <div style='padding: 10px 0;'>
-                    <div style='padding: 10px 0;'>
-                        <div id="app-content">
+                    <div id="app-content">
         """,
         unsafe_allow_html=True
     )
