@@ -198,7 +198,7 @@ def main():
     logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Derived Content UC Generator App", layout='wide')
 
-    # CSS for dynamic footer positioning
+    # CSS for dynamic footer positioning and reducing space between elements
     st.markdown("""
         <style>
         html, body, [class*="css"] {
@@ -218,16 +218,49 @@ def main():
             flex: 1 0 auto;
             padding-top: 100px;  /* Ensure the main content is not overlapped by the header */
         }
+        .header {
+            background-color: #002855;
+            color: white;
+            padding: 20px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 999;
+        }
+        .header h2 {
+            margin: 0;
+        }
+        .header div {
+            float: right;
+        }
+        .header a {
+            color: white;
+            margin-right: 15px;
+        }
+        .title-container {
+            display: flex;
+            align-items: center;
+            padding-top: 60px;  /* Reduced padding */
+            padding-bottom: 10px;  /* Reduced space between title and tabs */
+        }
+        .title-container img {
+            width: 50px;
+            margin-right: 10px;
+        }
+        .title-container h1 {
+            margin: 0;
+            font-size: 24px;
+        }
         </style>
         """, unsafe_allow_html=True)
 
     # Add the top header
     st.markdown("""
-        <div style="background-color: #002855; color: white; padding: 20px; position: fixed; top: 0; width: 100%; z-index: 999;">
-            <h2 style="margin: 0;">United States - Asset Manager</h2>
-            <div style="float: right;">
-                <a href="https://www.statestreet.com/contact-us.html" style="color: white; margin-right: 15px;">Contact Us</a>
-                <a href="https://www.statestreet.com/company-websites.html" style="color: white;">Company Websites</a>
+        <div class="header">
+            <h2>United States - Asset Manager</h2>
+            <div>
+                <a href="https://www.statestreet.com/contact-us.html">Contact Us</a>
+                <a href="https://www.statestreet.com/company-websites.html">Company Websites</a>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -235,9 +268,9 @@ def main():
     # Add header image and application name
     header_image_url = "https://your-image-url.com/header.png"  # Update this URL to your header image
     st.markdown(f"""
-    <div style='display: flex; align-items: center; padding-top: 100px;'>  <!-- Add padding to avoid overlap with fixed header -->
-        <img src='{header_image_url}' style='width: 50px; margin-right: 10px;'>
-        <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
+    <div class='title-container'>
+        <img src='{header_image_url}'>
+        <h1>Digital Marketing Derived Content Generator</h1>
     </div>
     """, unsafe_allow_html=True)
 
