@@ -213,6 +213,7 @@ def main():
             flex: 1;
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
         }
 
         .main-content {
@@ -251,16 +252,13 @@ def main():
             text-align: center;
             font-size: 14px;
             width: 100%;
-            position: relative;
+            position: absolute;
             bottom: 0;
         }
 
-        /* This will ensure the main content area pushes the footer down */
+        /* Ensure main content pushes the footer down */
         .content {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
         }
         </style>
         """,
@@ -291,7 +289,7 @@ def main():
 
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
-    st.markdown("</div></div>", unsafe_allow_html=True)  # Close the tabs-container and main-content divs
+    st.markdown("</div></div></div>", unsafe_allow_html=True)  # Close the tabs-container and main-content divs
 
     if "pdf_id" not in st.session_state:
         st.session_state.pdf_id = None
