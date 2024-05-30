@@ -212,11 +212,11 @@ def main():
             background-color: #002855;
             color: white;
             text-align: center;
-            padding: 10px 0;
+            padding: 20px 0;  /* Increased padding for better visibility */
         }
         .main {
-            min-height: 90vh;  /* Adjust based on your header height */
-            padding-bottom: 50px; /* Padding to ensure content does not overlap footer */
+            min-height: calc(100vh - 160px);  /* Adjust based on your header and footer height */
+            padding-top: 80px;  /* Ensure the main content is not overlapped by the header */
         }
         </style>
         """, unsafe_allow_html=True)
@@ -224,11 +224,22 @@ def main():
     # Add the top header
     st.markdown("""
         <div style="background-color: #002855; color: white; padding: 20px; position: fixed; top: 0; width: 100%; z-index: 999;">
-            <h2>United States - Asset Manager</h2>
-            <a href="https://www.statestreet.com/contact-us.html" style="color: white; margin-right: 15px;">Contact Us</a>
-            <a href="https://www.statestreet.com/company-websites.html" style="color: white;">Company Websites</a>
+            <h2 style="margin: 0;">United States - Asset Manager</h2>
+            <div style="float: right;">
+                <a href="https://www.statestreet.com/contact-us.html" style="color: white; margin-right: 15px;">Contact Us</a>
+                <a href="https://www.statestreet.com/company-websites.html" style="color: white;">Company Websites</a>
+            </div>
         </div>
         """, unsafe_allow_html=True)
+
+    # Add header image and application name
+    header_image_url = "https://your-image-url.com/header.png"  # Update this URL to your header image
+    st.markdown(f"""
+    <div style='display: flex; align-items: center; padding-top: 100px;'>  <!-- Add padding to avoid overlap with fixed header -->
+        <img src='{header_image_url}' style='width: 50px; margin-right: 10px;'>
+        <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.sidebar.title("Menu")
 
@@ -370,4 +381,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
