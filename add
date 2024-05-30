@@ -230,7 +230,7 @@ def main():
             display: flex;
             align-items: center;
             padding-top: 80px;  /* Adjust padding to control space between elements */
-            padding-bottom: 10px;
+            padding-bottom: 5px;  /* Decrease this value to reduce space below the title */
         }
         .title-container img {
             width: 50px;
@@ -241,14 +241,15 @@ def main():
             font-size: 24px;
         }
         .tabs-container {
-            padding-top: 10px;  /* Adjust padding to control space between title and tabs */
-            padding-bottom: 20px;  /* Adjust padding to control space between tabs and content */
-            margin-bottom: 50px;  /* Add margin-bottom to increase space below tabs */
+            padding-top: 5px;  /* Adjust padding to control space between title and tabs */
+            padding-bottom: 0px;  /* Adjust padding to control space between tabs and content */
+            margin-bottom: 20px;  /* Add margin-bottom to increase space below tabs */
         }
         .main-content {
             flex: 1 0 auto;
             padding: 20px;
-            padding-top: 40px;  /* Ensure the main content is not overlapped by the header and tabs */
+            padding-top: 20px;  /* Ensure the main content is not overlapped by the header and tabs */
+            padding-bottom: 50px;  /* Increase this value to add more space above the footer */
         }
         .footer {
             background-color: #002855;
