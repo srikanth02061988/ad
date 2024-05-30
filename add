@@ -198,7 +198,7 @@ def main():
     logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Derived Content UC Generator App", layout='wide')
 
-    # CSS for dynamic footer positioning and reducing space between elements
+    # CSS for separate sections and dynamic footer
     st.markdown("""
         <style>
         html, body, [class*="css"] {
@@ -207,25 +207,14 @@ def main():
             display: flex;
             flex-direction: column;
         }
-        .footer {
-            background-color: #002855;
-            color: white;
-            text-align: center;
-            padding: 20px 0;  /* Increased padding for better visibility */
-            flex-shrink: 0;
-        }
-        .main-content {
-            flex: 1 0 auto;
-            padding-top: 100px;  /* Ensure the main content is not overlapped by the header */
-        }
         .header {
             background-color: #002855;
             color: white;
             padding: 20px;
-            position: fixed;
-            top: 0;
             width: 100%;
             z-index: 999;
+            position: fixed;
+            top: 0;
         }
         .header h2 {
             margin: 0;
@@ -240,8 +229,8 @@ def main():
         .title-container {
             display: flex;
             align-items: center;
-            padding-top: 60px;  /* Reduced padding */
-            padding-bottom: 10px;  /* Reduced space between title and tabs */
+            padding-top: 80px;  /* Adjust padding to control space between elements */
+            padding-bottom: 10px;
         }
         .title-container img {
             width: 50px;
@@ -250,6 +239,23 @@ def main():
         .title-container h1 {
             margin: 0;
             font-size: 24px;
+        }
+        .tabs-container {
+            padding-top: 10px;  /* Adjust padding to control space between title and tabs */
+            padding-bottom: 20px;  /* Adjust padding to control space between tabs and content */
+        }
+        .main-content {
+            flex: 1 0 auto;
+            padding: 20px;
+            padding-top: 40px;  /* Ensure the main content is not overlapped by the header and tabs */
+        }
+        .footer {
+            background-color: #002855;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            flex-shrink: 0;
+            margin-top: auto;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -276,10 +282,13 @@ def main():
 
     st.sidebar.title("Menu")
 
+    # Tabs container
+    st.markdown('<div class="tabs-container">', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
+    st.markdown('</div>', unsafe_allow_html=True)
+
     # Main content area
     st.markdown('<div class="main-content">', unsafe_allow_html=True)
-
-    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
     if "pdf_id" not in st.session_state:
         st.session_state.pdf_id = None
