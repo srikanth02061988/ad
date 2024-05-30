@@ -220,7 +220,7 @@ def main():
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
-            padding-top: 80px;
+            padding-top: 100px; /* Adjust this based on your header height */
             padding-bottom: 20px;
         }
 
@@ -277,8 +277,7 @@ def main():
                     <img src='https://your-image-url.com/header.png' style='width: 50px; margin-right: 10px;'>
                     <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
                 </div>
-                <div style='padding: 10px 0;'>
-                    <div id="app-content">
+                <div id="tabs-container">
         """,
         unsafe_allow_html=True
     )
@@ -396,7 +395,7 @@ def main():
                     key="download_button_tab2"
                 )
 
-    st.markdown("</div></div></div>", unsafe_allow_html=True)  # Close the main content and content wrapper divs
+    st.markdown("</div></div>", unsafe_allow_html=True)  # Close the main content and tabs-container divs
 
     # Add footer at the end
     st.markdown(
