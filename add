@@ -206,27 +206,28 @@ def main():
             display: flex;
             flex-direction: column;
             min-height: 100vh; /* Make the body take the full viewport height */
+            margin: 0;
         }
 
         .main-content {
             flex: 1; /* Make the main content area take the remaining space */
-            padding-top: 100px; /* Adjust based on your header height */
-            padding-bottom: 50px; /* Adjust based on your footer height */
+            padding-top: 80px; /* Adjust based on your header height */
+            padding-bottom: 0px; /* Adjust based on your footer height */
         }
 
         .header {
             background-color: #002855;
             color: white;
-            padding: 70px 100px;
+            padding: 20px 50px;
             text-align: left;
             font-size: 15px;
             position: fixed;
             top: 0;
-            left: 150px;
+            left: 0;
             right: 0;
             z-index: 1000;
-            height: 100px;
-            line-height: 50px;
+            height: 80px;
+            line-height: 20px;
         }
 
         .header a {
@@ -244,9 +245,8 @@ def main():
             padding: 10px;
             text-align: center;
             font-size: 14px;
-            margin-top: 50px;
-            width: calc(100% - 1px);
-            margin-left: 1px;
+            width: 100%;
+            margin-left: 0;
             position: relative;
         }
         </style>
@@ -264,11 +264,11 @@ def main():
             </div>
         </div>
         <div class="main-content">
-            <div style='display: flex; align-items: center; padding-top: 80px;'>  <!-- Add padding to avoid overlap with fixed header -->
+            <div style='display: flex; align-items: center; padding-top: 0px;'>  <!-- Add padding to avoid overlap with fixed header -->
                 <img src='https://your-image-url.com/header.png' style='width: 50px; margin-right: 10px;'>
                 <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
             </div>
-            <div style='padding: 20px 0;'>
+            <div style='padding: 10px 0;'>
         """,
         unsafe_allow_html=True
     )
@@ -417,4 +417,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
