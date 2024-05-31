@@ -321,14 +321,14 @@ def main():
                 with st.spinner("Generating..."):
                     if st.session_state.category_selected != category:
                         st.session_state.regenerate_count = 0
-                    with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
-                        try:
+                    try:
+                        with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
                             prompts = json.load(file)
                             logger.info("Prompts loaded successfully.")
-                        except json.JSONDecodeError:
-                            logger.error("Error loading prompts from JSON.")
-                            st.error("Error loading prompts. Please check the prompts.json file.")
-                            return
+                    except json.JSONDecodeError:
+                        logger.error("Error loading prompts from JSON.")
+                        st.error("Error loading prompts. Please check the prompts.json file.")
+                        return
                     system_prompt = prompts.get(category, "Default prompt")
                     text_chunks = st.session_state.get("text_chunks", [])
                     responses = generate_responses(system_prompt, text_chunks, client)
@@ -414,4 +414,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
