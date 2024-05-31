@@ -56,7 +56,6 @@ def get_embeddings(text, endpoint, headers, deployment=embedding_deployment):
         st.error(f"An error occurred while generating embeddings: {e}")
         return None
 
-@st.cache_data
 def get_pdf_text(pdf_docs):
     text = ""
     try:
@@ -72,7 +71,6 @@ def get_pdf_text(pdf_docs):
         st.error(f"An error occurred while extracting text from PDF: {e}")
     return text
 
-@st.cache_data
 def get_text_chunks(text):
     logger.info("Splitting text into chunks...")
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
@@ -310,86 +308,85 @@ def main():
 
     # Tabs and Main Content Area
     st.markdown('<div class="tabs-area">', unsafe_allow_html=True)
-    with st.container():
-        tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
+    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
-        with tab1:
-            st.markdown('<div class="main-content">', unsafe_allow_html=True)
-            if st.session_state.pdf_id:
-                category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
-                if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
-                    st.session_state.responses_tab1 = []  # Clear previous responses
-                    with st.spinner("Generating..."):
-                        if st.session_state.category_selected != category:
-                            st.session_state.regenerate_count = 0
-                        try:
-                            with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
-                                prompts = json.load(file)
-                                logger.info("Prompts loaded successfully.")
-                        except json.JSONDecodeError:
-                            logger.error("Error loading prompts from JSON.")
-                            st.error("Error loading prompts. Please check the prompts.json file.")
-                            return
-                        system_prompt = prompts.get(category, "Default prompt")
-                        text_chunks = st.session_state.get("text_chunks", [])
-                        responses = generate_responses(system_prompt, text_chunks, client)
+    with tab1:
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        if st.session_state.pdf_id:
+            category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
+            if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
+                st.session_state.responses_tab1 = []  # Clear previous responses
+                with st.spinner("Generating..."):
+                    if st.session_state.category_selected != category:
+                        st.session_state.regenerate_count = 0
+                    try:
+                        with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
+                            prompts = json.load(file)
+                            logger.info("Prompts loaded successfully.")
+                    except json.JSONDecodeError:
+                        logger.error("Error loading prompts from JSON.")
+                        st.error("Error loading prompts. Please check the prompts.json file.")
+                        return
+                    system_prompt = prompts.get(category, "Default prompt")
+                    text_chunks = st.session_state.get("text_chunks", [])
+                    responses = generate_responses(system_prompt, text_chunks, client)
+                    if responses:
+                        st.session_state.responses_tab1 = responses
+                        st.session_state.category_selected = category
+                        st.session_state.regenerate_count = (st.session_state.regenerate_count + 1) % 3
+
+        if st.session_state.responses_tab1:
+            st.write("Responses:")
+            selected_response = st.radio("Select a response to download:", st.session_state.responses_tab1, key="responses_radio_tab1")
+            st.session_state.selected_response_tab1 = selected_response
+
+            if st.session_state.selected_response_tab1:
+                st.write("Selected Response:")
+                st.write(st.session_state.selected_response_tab1)
+                pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response_tab1, st.session_state.category_selected)
+                st.download_button(
+                    "Download Selected Response as PDF",
+                    data=pdf_buffer,
+                    file_name=pdf_filename,
+                    mime="application/pdf",
+                    key="download_button_tab1"
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="spacer" style="height: 100px;"></div>', unsafe_allow_html=True)
+
+    with tab2:
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        if st.session_state.pdf_id:
+            user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
+            if st.button("Submit", key="submit_tab2"):
+                st.session_state.responses_tab2 = []  # Clear previous responses
+                with st.spinner("Retrieving and processing..."):
+                    pdf_id = st.session_state.pdf_id
+                    docs, embeddings = retrieve_embeddings_from_db(pdf_id)
+                    if docs and embeddings is not None and embeddings.any():
+                        relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
+                        responses = generate_responses(user_question, relevant_docs, client)
                         if responses:
-                            st.session_state.responses_tab1 = responses
-                            st.session_state.category_selected = category
-                            st.session_state.regenerate_count = (st.session_state.regenerate_count + 1) % 3
+                            st.session_state.responses_tab2 = responses
 
-            if st.session_state.responses_tab1:
-                st.write("Responses:")
-                selected_response = st.radio("Select a response to download:", st.session_state.responses_tab1, key="responses_radio_tab1")
-                st.session_state.selected_response_tab1 = selected_response
+        if st.session_state.responses_tab2:
+            st.write("Responses:")
+            selected_response = st.radio("Select a response to download:", st.session_state.responses_tab2, key="responses_radio_tab2")
+            st.session_state.selected_response_tab2 = selected_response
 
-                if st.session_state.selected_response_tab1:
-                    st.write("Selected Response:")
-                    st.write(st.session_state.selected_response_tab1)
-                    pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response_tab1, st.session_state.category_selected)
-                    st.download_button(
-                        "Download Selected Response as PDF",
-                        data=pdf_buffer,
-                        file_name=pdf_filename,
-                        mime="application/pdf",
-                        key="download_button_tab1"
-                    )
-            st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('<div class="spacer" style="height: 100px;"></div>', unsafe_allow_html=True)
-
-        with tab2:
-            st.markdown('<div class="main-content">', unsafe_allow_html=True)
-            if st.session_state.pdf_id:
-                user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
-                if st.button("Submit", key="submit_tab2"):
-                    st.session_state.responses_tab2 = []  # Clear previous responses
-                    with st.spinner("Retrieving and processing..."):
-                        pdf_id = st.session_state.pdf_id
-                        docs, embeddings = retrieve_embeddings_from_db(pdf_id)
-                        if docs and embeddings is not None and embeddings.any():
-                            relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                            responses = generate_responses(user_question, relevant_docs, client)
-                            if responses:
-                                st.session_state.responses_tab2 = responses
-
-            if st.session_state.responses_tab2:
-                st.write("Responses:")
-                selected_response = st.radio("Select a response to download:", st.session_state.responses_tab2, key="responses_radio_tab2")
-                st.session_state.selected_response_tab2 = selected_response
-
-                if st.session_state.selected_response_tab2:
-                    st.write("Selected Response:")
-                    st.write(st.session_state.selected_response_tab2)
-                    pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response_tab2, "developer_prompt")
-                    st.download_button(
-                        "Download Selected Response as PDF",
-                        data=pdf_buffer,
-                        file_name=pdf_filename,
-                        mime="application/pdf",
-                        key="download_button_tab2"
-                    )
-            st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('<div class="spacer" style="height: 100px;"></div>', unsafe_allow_html=True)
+            if st.session_state.selected_response_tab2:
+                st.write("Selected Response:")
+                st.write(st.session_state.selected_response_tab2)
+                pdf_buffer, pdf_filename = create_pdf(st.session_state.selected_response_tab2, "developer_prompt")
+                st.download_button(
+                    "Download Selected Response as PDF",
+                    data=pdf_buffer,
+                    file_name=pdf_filename,
+                    mime="application/pdf",
+                    key="download_button_tab2"
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="spacer" style="height: 100px;"></div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)  # Close tabs-area
 
@@ -415,4 +412,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
