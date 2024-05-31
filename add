@@ -320,7 +320,7 @@ def header():
 
 def main():
     logger.info("Setting up the Streamlit page...")
-    st.set_page_config(page_title="Derived Content UC Generator App")
+    st.set_page_config(page_title="Derived Content UC Generator App", layout='wide')
 
     # Add the top header
     header()
@@ -420,6 +420,7 @@ def main():
                 )
 
     with tab2:
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
             if st.button("Submit", key="submit_tab2"):
@@ -449,8 +450,30 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab2"
                 )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-    footer()
+    st.markdown('</div>', unsafe_allow_html=True)  # Close tabs-area
+
+    # Footer
+    st.markdown("""
+    <div class="footer">
+        <hr style='border: 1px solid white; width: 80%; margin: auto;'>
+        2024 State Street Corporation. All rights reserved.
+        <br>
+        By accessing this website, you agree to be bound by the terms and conditions that appear herein.
+        <br>
+        These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.
+        <br>
+        If you do not agree with these terms and conditions, please do not access the website.
+        <br>
+        <a href="#" style="color: white;">Global Privacy Notice</a> |
+        <a href="#" style="color: white;">Cookie Settings</a> |
+        <a href="#" style="color: white;">Cookie Disclosure</a> |
+        <a href="#" style="color: white;">Legal</a> |
+        <a href="#" style="color: white;">Sitemap</a>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
