@@ -13,12 +13,9 @@ from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from htbuilder import HtmlElement, div, ul, li, br, hr, a, p, img, styles, classes, fonts
-from htbuilder.units import percent, px
-from htbuilder.funcs import rgba, rgb
 
 # Initialize logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname=s - %(message=s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Azure OpenAI client initialization
@@ -197,88 +194,6 @@ def create_pdf(text_response, category):
     buffer.seek(0)
     return buffer, f"{category}.pdf"
 
-def image(src_as_string, **style):
-    return img(src=src_as_string, style=styles(**style))
-
-def link(link, text, **style):
-    return a(_href=link, _target="_blank", style=styles(**style))(text)
-
-def layout(*args):
-
-    style = """
-    <style>
-      #MainMenu {visibility: hidden;}
-      footer {visibility: hidden;}
-      .stApp { bottom: 105px; }
-      .custom-footer {
-          position: relative;
-          bottom: 0;
-          width: calc(100% - 15rem); /* Exclude sidebar width */
-          left: 15rem; /* Align with sidebar */
-      }
-    </style>
-    """
-
-    style_div = styles(
-        width=percent(100),
-        color="white",
-        text_align="center",
-        background_color=rgb(13, 42, 80),
-        height="auto",
-        opacity=1
-    )
-
-    style_hr = styles(
-        display="block",
-        margin=px(8, 8, "auto", "auto"),
-        border_style="inset",
-        border_width=px(2)
-    )
-
-    body = p()
-    foot = div(
-        style=style_div,
-        class_="custom-footer"
-    )(
-        hr(
-            style=style_hr
-        ),
-        body
-    )
-
-    st.markdown(style, unsafe_allow_html=True)
-
-    for arg in args:
-        if isinstance(arg, str):
-            body(arg)
-
-        elif isinstance(arg, HtmlElement):
-            body(arg)
-
-    st.markdown(str(foot), unsafe_allow_html=True)
-
-def footer():
-    myargs = [
-        "2024 State Street Corporation. All rights reserved.",
-        br(),
-        "By accessing this website, you agree to be bound by the terms and conditions that appear herein.",
-        br(),
-        "These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.",
-        br(),
-        "If you do not agree with these terms and conditions, please do not access the website.",
-        br(),
-        link("#", "Global Privacy Notice"),
-        " | ",
-        link("#", "Cookie Settings"),
-        " | ",
-        link("#", "Cookie Disclosure"),
-        " | ",
-        link("#", "Legal"),
-        " | ",
-        link("#", "Sitemap")
-    ]
-    layout(*myargs)
-
 def main():
     logger.info("Setting up the Streamlit page...")
     st.set_page_config(page_title="Derived Content UC Generator App", layout='wide')
@@ -348,8 +263,11 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    # Sidebar
     st.sidebar.title("Menu")
+    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
 
+    # Initialize session state variables
     if "pdf_id" not in st.session_state:
         st.session_state.pdf_id = None
 
@@ -374,8 +292,6 @@ def main():
     if "regenerate_count" not in st.session_state:
         st.session_state.regenerate_count = 0
 
-    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
-
     if pdf_docs is not None and st.sidebar.button("Submit PDF"):
         with st.spinner("Processing..."):
             raw_text = get_pdf_text(pdf_docs)
@@ -390,9 +306,12 @@ def main():
                 logger.warning("No text extracted from PDF.")
                 st.error("Failed to extract text from the uploaded PDF.")
 
+    # Tabs and Main Content Area
+    st.markdown('<div class="tabs-area">', unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
     with tab1:
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
             if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
@@ -432,8 +351,11 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab1"
                 )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="spacer" style="height: 100px;"></div>', unsafe_allow_html=True)
 
     with tab2:
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
             if st.button("Submit", key="submit_tab2"):
@@ -463,9 +385,30 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab2"
                 )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="spacer" style="height: 100px;"></div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)  # Close tabs-area
 
     # Footer
-    footer()
+    st.markdown("""
+    <div class="footer">
+        <hr style='border: 1px solid white; width: 80%; margin: auto;'>
+        2024 State Street Corporation. All rights reserved.
+        <br>
+        By accessing this website, you agree to be bound by the terms and conditions that appear herein.
+        <br>
+        These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.
+        <br>
+        If you do not agree with these terms and conditions, please do not access the website.
+        <br>
+        <a href="#" style="color: white;">Global Privacy Notice</a> |
+        <a href="#" style="color: white;">Cookie Settings</a> |
+        <a href="#" style="color: white;">Cookie Disclosure</a> |
+        <a href="#" style="color: white;">Legal</a> |
+        <a href="#" style="color: white;">Sitemap</a>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
