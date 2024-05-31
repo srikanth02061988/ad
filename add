@@ -13,9 +13,12 @@ from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from htbuilder import HtmlElement, div, ul, li, br, hr, a, p, img, styles, classes, fonts
+from htbuilder.units import percent, px
+from htbuilder.funcs import rgba, rgb
 
 # Initialize logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname=s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Azure OpenAI client initialization
@@ -194,80 +197,147 @@ def create_pdf(text_response, category):
     buffer.seek(0)
     return buffer, f"{category}.pdf"
 
+def image(src_as_string, **style):
+    return img(src=src_as_string, style=styles(**style))
+
+def link(link, text, **style):
+    return a(_href=link, _target="_blank", style=styles(**style))(text)
+
+def layout(*args):
+
+    style = """
+    <style>
+      #MainMenu {visibility: hidden;}
+      footer {visibility: hidden;}
+      .stApp { bottom: 105px; }
+      .custom-footer {
+          position: relative;
+          bottom: 0;
+          width: calc(100% - 15rem); /* Exclude sidebar width */
+          left: 15rem; /* Align with sidebar */
+      }
+      .custom-header {
+          position: relative;
+          top: 0;
+          width: calc(100% - 15rem); /* Exclude sidebar width */
+          left: 15rem; /* Align with sidebar */
+      }
+    </style>
+    """
+
+    style_div = styles(
+        width=percent(100),
+        color="white",
+        text_align="center",
+        background_color=rgb(13, 42, 80),
+        height="auto",
+        opacity=1
+    )
+
+    style_hr = styles(
+        display="block",
+        margin=px(8, 8, "auto", "auto"),
+        border_style="inset",
+        border_width=px(2)
+    )
+
+    body = p()
+    foot = div(
+        style=style_div,
+        class_="custom-footer"
+    )(
+        hr(
+            style=style_hr
+        ),
+        body
+    )
+
+    st.markdown(style, unsafe_allow_html=True)
+
+    for arg in args:
+        if isinstance(arg, str):
+            body(arg)
+
+        elif isinstance(arg, HtmlElement):
+            body(arg)
+
+    st.markdown(str(foot), unsafe_allow_html=True)
+
+def footer():
+    myargs = [
+        "2024 State Street Corporation. All rights reserved.",
+        br(),
+        "By accessing this website, you agree to be bound by the terms and conditions that appear herein.",
+        br(),
+        "These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.",
+        br(),
+        "If you do not agree with these terms and conditions, please do not access the website.",
+        br(),
+        link("#", "Global Privacy Notice"),
+        " | ",
+        link("#", "Cookie Settings"),
+        " | ",
+        link("#", "Cookie Disclosure"),
+        " | ",
+        link("#", "Legal"),
+        " | ",
+        link("#", "Sitemap")
+    ]
+    layout(*myargs)
+
+def header():
+    st.markdown(
+        """
+        <style>
+        .header {
+            background-color: #002855;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-size: 20px;
+            position: relative;
+            width: calc(100% - 15rem); /* Exclude sidebar width */
+            left: 15rem; /* Align with sidebar */
+        }
+        .header a {
+            color: white;
+            margin-right: 15px;
+        }
+        .header-right {
+            float: right;
+        }
+        </style>
+        <div class="header custom-header">
+            United States - Asset Manager
+            <div class="header-right">
+                <a href="https://www.statestreet.com/contact-us.html">Contact Us</a>
+                <a href="https://www.statestreet.com/company-websites.html">Company Websites</a>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 def main():
     logger.info("Setting up the Streamlit page...")
-    st.set_page_config(page_title="Derived Content UC Generator App", layout='wide')
+    st.set_page_config(page_title="Derived Content UC Generator App")
 
-    # CSS for separate sections
-    st.markdown("""
-    <style>
-    html, body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-    }
-    .header {
-        background-color: #002855;
-        color: white;
-        padding: 10px 20px;
-        width: 100%;
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 999;
-        display: flex;
-        align-items: center;
-        flex-direction: row; /* Ensure logo and text are inline */
-        justify-content: flex-start; /* Align to the left */
-    }
-    .header img {
-        margin-right: 10px;
-    }
-    .header h1 {
-        font-size: 25px; /* Adjust the font size as needed */
-        margin: 0;
-    }
-    .tabs-area {
-        margin-top: 60px; /* Adjust to the header height */
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
-    .main-content {
-        flex-grow: 1;
-        padding: 20px;
-        overflow: auto;
-    }
-    .footer {
-        background-color: #002855;
-        color: white;
-        text-align: center;
-        padding: 10px 0;
-        width: 100%;
-        margin-top: auto; /* Ensures footer is at the bottom when content is short */
-    }
-    .spacer {
-        margin-bottom: 100px; /* Adjustable to increase distance from the footer */
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    # Add the top header
+    header()
 
-    # Header
-    logo_url = "https://your-image-url.com/logo.png"  # Update this URL to your logo image
+    # Add header image and application name
+    header_image_url = "https://your-image-url.com/header.png"  # Update this URL to your header image
     st.markdown(f"""
-    <div class="header">
-        <img src="{logo_url}" alt="Logo" height="50">
-        <h1>Digital Marketing Derived Content Generator</h1>
+    <div style='display: flex; align-items: center;'>
+        <img src='{header_image_url}' style='width: 50px; margin-right: 10px;'>
+        <h1 style='margin: 0; font-size: 24px;'>Digital Marketing Derived Content Generator</h1>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar
     st.sidebar.title("Menu")
-    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
 
-    # Initialize session state variables
+    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
+
     if "pdf_id" not in st.session_state:
         st.session_state.pdf_id = None
 
@@ -292,26 +362,23 @@ def main():
     if "regenerate_count" not in st.session_state:
         st.session_state.regenerate_count = 0
 
-    if pdf_docs is not None and st.sidebar.button("Submit PDF"):
-        with st.spinner("Processing..."):
-            raw_text = get_pdf_text(pdf_docs)
-            if raw_text:
-                text_chunks = get_text_chunks(raw_text)
-                pdf_id = str(uuid.uuid4())
-                store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
-                st.session_state.pdf_id = pdf_id
-                st.session_state.text_chunks = text_chunks
-                st.sidebar.success("PDF processed and embeddings stored.")
-            else:
-                logger.warning("No text extracted from PDF.")
-                st.error("Failed to extract text from the uploaded PDF.")
-
-    # Tabs and Main Content Area
-    st.markdown('<div class="tabs-area">', unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
-
     with tab1:
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"], key="pdf_upload_tab1")
+
+        if pdf_docs is not None and st.sidebar.button("Submit PDF", key="submit_pdf_tab1"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                if raw_text:
+                    text_chunks = get_text_chunks(raw_text)
+                    pdf_id = str(uuid.uuid4())
+                    store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+                    st.session_state.pdf_id = pdf_id
+                    st.session_state.text_chunks = text_chunks
+                    st.sidebar.success("PDF processed and embeddings stored.")
+                else:
+                    logger.warning("No text extracted from PDF.")
+                    st.error("Failed to extract text from the uploaded PDF.")
+
         if st.session_state.pdf_id:
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
             if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
@@ -351,11 +418,8 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab1"
                 )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
     with tab2:
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
             if st.button("Submit", key="submit_tab2"):
@@ -385,30 +449,8 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab2"
                 )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)  # Close tabs-area
-
-    # Footer
-    st.markdown("""
-    <div class="footer">
-        <hr style='border: 1px solid white; width: 80%; margin: auto;'>
-        2024 State Street Corporation. All rights reserved.
-        <br>
-        By accessing this website, you agree to be bound by the terms and conditions that appear herein.
-        <br>
-        These terms and conditions are subject to change. State Street reserves the right to modify these terms and conditions, which it may do by posting changes to the website.
-        <br>
-        If you do not agree with these terms and conditions, please do not access the website.
-        <br>
-        <a href="#" style="color: white;">Global Privacy Notice</a> |
-        <a href="#" style="color: white;">Cookie Settings</a> |
-        <a href="#" style="color: white;">Cookie Disclosure</a> |
-        <a href="#" style="color: white;">Legal</a> |
-        <a href="#" style="color: white;">Sitemap</a>
-    </div>
-    """, unsafe_allow_html=True)
+    footer()
 
 if __name__ == "__main__":
     main()
