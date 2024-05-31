@@ -267,6 +267,7 @@ def main():
     st.sidebar.title("Menu")
     pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
 
+    # Initialize session state variables
     if "pdf_id" not in st.session_state:
         st.session_state.pdf_id = None
 
@@ -411,4 +412,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
