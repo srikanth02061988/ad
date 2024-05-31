@@ -18,7 +18,7 @@ from htbuilder.units import percent, px
 from htbuilder.funcs import rgba, rgb
 
 # Initialize logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname=s - %(message=s')
 logger = logging.getLogger(__name__)
 
 # Azure OpenAI client initialization
@@ -314,7 +314,7 @@ def main():
         font-size: 25px; /* Adjust the font size as needed */
         margin: 0;
     }
-    .tabs-container {
+    .tabs-area {
         margin-top: 60px; /* Adjust to the header height */
         flex: 1;
         display: flex;
@@ -390,11 +390,9 @@ def main():
                 logger.warning("No text extracted from PDF.")
                 st.error("Failed to extract text from the uploaded PDF.")
 
-    st.markdown('<div class="tabs-container">', unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
 
     with tab1:
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
             if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
@@ -434,11 +432,8 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab1"
                 )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
     with tab2:
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
             if st.button("Submit", key="submit_tab2"):
@@ -468,10 +463,6 @@ def main():
                     mime="application/pdf",
                     key="download_button_tab2"
                 )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)  # Close tabs-container
 
     # Footer
     footer()
