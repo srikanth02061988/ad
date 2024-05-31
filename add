@@ -293,18 +293,17 @@ def main():
         st.session_state.regenerate_count = 0
 
     if pdf_docs is not None and st.sidebar.button("Submit PDF"):
-        with st.spinner("Processing..."):
-            raw_text = get_pdf_text(pdf_docs)
-            if raw_text:
-                text_chunks = get_text_chunks(raw_text)
-                pdf_id = str(uuid.uuid4())
-                store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
-                st.session_state.pdf_id = pdf_id
-                st.session_state.text_chunks = text_chunks
-                st.sidebar.success("PDF processed and embeddings stored.")
-            else:
-                logger.warning("No text extracted from PDF.")
-                st.error("Failed to extract text from the uploaded PDF.")
+        raw_text = get_pdf_text(pdf_docs)
+        if raw_text:
+            text_chunks = get_text_chunks(raw_text)
+            pdf_id = str(uuid.uuid4())
+            store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+            st.session_state.pdf_id = pdf_id
+            st.session_state.text_chunks = text_chunks
+            st.sidebar.success("PDF processed and embeddings stored.")
+        else:
+            logger.warning("No text extracted from PDF.")
+            st.error("Failed to extract text from the uploaded PDF.")
 
     # Tabs and Main Content Area
     st.markdown('<div class="tabs-area">', unsafe_allow_html=True)
@@ -316,24 +315,23 @@ def main():
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
             if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
                 st.session_state.responses_tab1 = []  # Clear previous responses
-                with st.spinner("Generating..."):
-                    if st.session_state.category_selected != category:
-                        st.session_state.regenerate_count = 0
-                    try:
-                        with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
-                            prompts = json.load(file)
-                            logger.info("Prompts loaded successfully.")
-                    except json.JSONDecodeError:
-                        logger.error("Error loading prompts from JSON.")
-                        st.error("Error loading prompts. Please check the prompts.json file.")
-                        return
-                    system_prompt = prompts.get(category, "Default prompt")
-                    text_chunks = st.session_state.get("text_chunks", [])
-                    responses = generate_responses(system_prompt, text_chunks, client)
-                    if responses:
-                        st.session_state.responses_tab1 = responses
-                        st.session_state.category_selected = category
-                        st.session_state.regenerate_count = (st.session_state.regenerate_count + 1) % 3
+                if st.session_state.category_selected != category:
+                    st.session_state.regenerate_count = 0
+                try:
+                    with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
+                        prompts = json.load(file)
+                        logger.info("Prompts loaded successfully.")
+                except json.JSONDecodeError:
+                    logger.error("Error loading prompts from JSON.")
+                    st.error("Error loading prompts. Please check the prompts.json file.")
+                    return
+                system_prompt = prompts.get(category, "Default prompt")
+                text_chunks = st.session_state.get("text_chunks", [])
+                responses = generate_responses(system_prompt, text_chunks, client)
+                if responses:
+                    st.session_state.responses_tab1 = responses
+                    st.session_state.category_selected = category
+                    st.session_state.regenerate_count = (st.session_state.regenerate_count + 1) % 3
 
         if st.session_state.responses_tab1:
             st.write("Responses:")
@@ -360,14 +358,13 @@ def main():
             user_question = st.text_area("Ask a Question based on the uploaded PDF", height=200, key="question_tab2")
             if st.button("Submit", key="submit_tab2"):
                 st.session_state.responses_tab2 = []  # Clear previous responses
-                with st.spinner("Retrieving and processing..."):
-                    pdf_id = st.session_state.pdf_id
-                    docs, embeddings = retrieve_embeddings_from_db(pdf_id)
-                    if docs and embeddings is not None and embeddings.any():
-                        relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
-                        responses = generate_responses(user_question, relevant_docs, client)
-                        if responses:
-                            st.session_state.responses_tab2 = responses
+                pdf_id = st.session_state.pdf_id
+                docs, embeddings = retrieve_embeddings_from_db(pdf_id)
+                if docs and embeddings is not None and embeddings.any():
+                    relevant_docs = find_relevant_chunks(user_question, docs, embeddings)
+                    responses = generate_responses(user_question, relevant_docs, client)
+                    if responses:
+                        st.session_state.responses_tab2 = responses
 
         if st.session_state.responses_tab2:
             st.write("Responses:")
