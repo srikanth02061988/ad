@@ -249,6 +249,22 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    # Sidebar
+    st.sidebar.title("Menu")
+    pdf_docs = st.sidebar.file_uploader("Upload your PDF Files", type=["pdf"])
+
+    if pdf_docs is not None and st.sidebar.button("Submit PDF"):
+        with st.spinner("Processing..."):
+            raw_text = get_pdf_text(pdf_docs)
+            if raw_text:
+                text_chunks = get_text_chunks(raw_text)
+                pdf_id = str(uuid.uuid4())
+                store_embeddings_in_db(pdf_id, text_chunks, azure_endpoint, headers)
+                st.sidebar.success("PDF processed and embeddings stored.")
+            else:
+                logger.warning("No text extracted from PDF.")
+                st.error("Failed to extract text from the uploaded PDF.")
+
     # Tabs and Main Content Area
     st.markdown('<div class="tabs-area">', unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["Upload & Generate", "Developer Prompt"])
