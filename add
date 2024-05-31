@@ -228,9 +228,10 @@ def main():
         }
         .title-container {
             display: flex;
+            justify-content: center;
             align-items: center;
-            padding-top: 80px;  /* Adjust padding to control space between elements */
-            padding-bottom: 5px;  /* Decrease this value to reduce space below the title */
+            padding-top: 80px;  /* Adjust this value to control space between header and title */
+            padding-bottom: 10px;
         }
         .title-container img {
             width: 50px;
@@ -241,23 +242,24 @@ def main():
             font-size: 24px;
         }
         .tabs-container {
-            padding-top: 5px;  /* Adjust padding to control space between title and tabs */
-            padding-bottom: 0px;  /* Adjust padding to control space between tabs and content */
-            margin-bottom: 20px;  /* Add margin-bottom to increase space below tabs */
+            padding-top: 5px;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
         }
         .main-content {
-            flex: 1 0 auto;
+            flex: 1;
             padding: 20px;
-            padding-top: 20px;  /* Ensure the main content is not overlapped by the header and tabs */
-            padding-bottom: 50px;  /* Increase this value to add more space above the footer */
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
         }
         .footer {
             background-color: #002855;
             color: white;
             text-align: center;
             padding: 20px 0;
-            flex-shrink: 0;
-            margin-top: auto;
+            width: 100%;
+            margin-top: auto;  /* Ensure the footer stays at the bottom */
         }
         </style>
         """, unsafe_allow_html=True)
