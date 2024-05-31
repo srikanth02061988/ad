@@ -211,10 +211,11 @@ def main():
             background-color: #002855;
             color: white;
             padding: 20px;
-            width: 100%;
+            width: calc(100% - 300px);  /* Adjust width to not overlap with the sidebar */
             z-index: 999;
             position: fixed;
             top: 0;
+            left: 300px;  /* Adjust left position to align with the main content area */
         }
         .header h2 {
             margin: 0;
@@ -232,6 +233,8 @@ def main():
             align-items: center;
             padding-top: 80px;  /* Adjust this value to control space between header and title */
             padding-bottom: 10px;
+            width: calc(100% - 300px);  /* Adjust width to not overlap with the sidebar */
+            margin-left: 300px;  /* Align with the main content area */
         }
         .title-container img {
             width: 50px;
@@ -245,6 +248,8 @@ def main():
             padding-top: 5px;
             padding-bottom: 10px;
             margin-bottom: 20px;
+            width: calc(100% - 300px);  /* Adjust width to not overlap with the sidebar */
+            margin-left: 300px;  /* Align with the main content area */
         }
         .main-content {
             flex: 1;
@@ -252,14 +257,17 @@ def main():
             padding-top: 20px;
             display: flex;
             flex-direction: column;
+            width: calc(100% - 300px);  /* Adjust width to not overlap with the sidebar */
+            margin-left: 300px;  /* Align with the main content area */
         }
         .footer {
             background-color: #002855;
             color: white;
             text-align: center;
             padding: 20px 0;
-            width: 100%;
+            width: calc(100% - 300px);  /* Adjust width to not overlap with the sidebar */
             margin-top: auto;  /* Ensure the footer stays at the bottom */
+            margin-left: 300px;  /* Align with the main content area */
         }
         </style>
         """, unsafe_allow_html=True)
