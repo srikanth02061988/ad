@@ -217,6 +217,12 @@ def main():
         top: 0;
         left: 0;
         z-index: 999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .header img {
+        margin-right: 10px;
     }
     .tabs-area {
         margin-top: 60px; /* Adjust to the header height */
@@ -244,8 +250,10 @@ def main():
     """, unsafe_allow_html=True)
 
     # Header
-    st.markdown("""
+    logo_url = "https://your-image-url.com/logo.png"  # Update this URL to your logo image
+    st.markdown(f"""
     <div class="header">
+        <img src="{logo_url}" alt="Logo" height="50">
         <h1>Digital Marketing Derived Content Generator</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -300,24 +308,26 @@ def main():
         st.markdown('<div class="main-content">', unsafe_allow_html=True)
         if st.session_state.pdf_id:
             category = st.selectbox("Select the category to search within:", ["Twitter", "LinkedIn", "Asset Intelligence", "Article Card", "Other"], key="category_tab1")
-            if st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1"):
-                if st.session_state.category_selected != category:
-                    st.session_state.regenerate_count = 0
-                with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
-                    try:
-                        prompts = json.load(file)
-                        logger.info("Prompts loaded successfully.")
-                    except json.JSONDecodeError:
-                        logger.error("Error loading prompts from JSON.")
-                        st.error("Error loading prompts. Please check the prompts.json file.")
-                        return
-                system_prompt = prompts.get(category, "Default prompt")
-                text_chunks = st.session_state.get("text_chunks", [])
-                responses = generate_responses(system_prompt, text_chunks, client)
-                if responses:
-                    st.session_state.responses_tab1 = responses
-                    st.session_state.category_selected = category
-                    st.session_state.regenerate_count = (st.session_state.regenerate_count + 1) % 3
+            generate_button = st.button("Generate" if st.session_state.regenerate_count == 0 else "Regenerate", key="generate_button_tab1")
+            if generate_button:
+                with st.spinner("Generating..."):
+                    if st.session_state.category_selected != category:
+                        st.session_state.regenerate_count = 0
+                    with open(f"prompts{st.session_state.regenerate_count}.json", "r") as file:
+                        try:
+                            prompts = json.load(file)
+                            logger.info("Prompts loaded successfully.")
+                        except json.JSONDecodeError:
+                            logger.error("Error loading prompts from JSON.")
+                            st.error("Error loading prompts. Please check the prompts.json file.")
+                            return
+                    system_prompt = prompts.get(category, "Default prompt")
+                    text_chunks = st.session_state.get("text_chunks", [])
+                    responses = generate_responses(system_prompt, text_chunks, client)
+                    if responses:
+                        st.session_state.responses_tab1 = responses
+                        st.session_state.category_selected = category
+                        st.session_state.regenerate_count = (st.session_state.regenerate_count + 1) % 3
 
         if st.session_state.responses_tab1:
             st.write("Responses:")
@@ -395,4 +405,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
