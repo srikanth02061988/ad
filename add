@@ -1,14 +1,1 @@
-Input: "What is the name of the audit company and its headquarters' address?"
-Expected Output: "The audit company is PricewaterhouseCoopers, and its headquarters' address is 18 Forum Lane, Camana Bay, P.O. Box 258, Grand Cayman, Cayman Islands, KY1- 1104."
 
-Input: "What ethical responsibilities did the auditors adhere to?"
-Expected Output: "The auditors adhered to ethical responsibilities in accordance with the relevant ethical requirements relating to their audit."
-
-Input: "On which date was the report signed and by whom?"
-Expected Output: "The report was signed on April 26, 2022, by PricewaterhouseCoopers."
-
-Input: "Describe the audit opinion provided by the auditors."
-Expected Output: "The audit opinion states that the accompanying combined financial statements present fairly, in all material respects, the financial position of the Fund as of December 31, 2021."
-
-Input: "What standards were followed during the audit?"
-Expected Output: "The audit was conducted in accordance with auditing standards generally accepted in the United States of America (US GAAS)."
