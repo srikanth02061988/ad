@@ -1,1 +1,48 @@
+Input: "What is the name of the audit company and its headquarters' address?"
+Expected Output: "The audit company is PricewaterhouseCoopers, and its headquarters' address is 18 Forum Lane, Camana Bay, P.O. Box 258, Grand Cayman, Cayman Islands, KY1- 1104."
 
+Input: "What ethical responsibilities did the auditors adhere to?"
+Expected Output: "The auditors adhered to ethical responsibilities in accordance with the relevant ethical requirements relating to their audit."
+
+Input: "On which date was the report signed and by whom?"
+Expected Output: "The report was signed on April 26, 2022, by PricewaterhouseCoopers."
+
+Input: "Describe the audit opinion provided by the auditors."
+Expected Output: "The audit opinion states that the accompanying combined financial statements present fairly, in all material respects, the financial position of the Fund as of December 31, 2021."
+
+Input: "What standards were followed during the audit?"
+Expected Output: "The audit was conducted in accordance with auditing standards generally accepted in the United States of America (US GAAS)."
+
+These inputs are designed to test the reference text's understanding and ensure that it can provide accurate information without generating hallucinated content. Could you run these inputs through your system and provide the outputs? This will help us verify if any hallucinations occur.
+
+
+
+
+
+i need really tricky questions by which llm can generate hallucinated responses
+ChatGPT
+Certainly! Here are some tricky questions designed to potentially induce hallucinations and test the robustness of the LLM's response generation:
+
+Input: "What is the total amount of capital reported by Apollo Navigator Aviation Offshore Fund I, L.P. as of December 31, 2021?"
+Expected Output: There should be no specific amount mentioned, as the reference text does not provide an exact figure for the total capital.
+
+Input: "Who were the individual auditors responsible for the report?"
+Expected Output: The reference text does not mention individual auditors, so the correct response should indicate that this information is not provided.
+
+Input: "What were the major findings and recommendations of the audit?"
+Expected Output: The reference text does not detail specific findings and recommendations, so the correct response should indicate that this information is not provided.
+
+Input: "What percentage of material misstatements were identified in the financial statements?"
+Expected Output: The reference text does not quantify material misstatements in percentage terms, so the correct response should indicate that this information is not provided.
+
+Input: "Which ethical violations were discovered during the audit?"
+Expected Output: The reference text does not mention any ethical violations, so the correct response should indicate that no such information is provided.
+
+Input: "What are the future financial projections for the Apollo Navigator Aviation Offshore Fund?"
+Expected Output: The reference text does not include future financial projections, so the correct response should indicate that this information is not provided.
+
+Input: "What specific changes in partners' capital were noted?"
+Expected Output: While changes in partners' capital are mentioned, specific details are not provided. The correct response should acknowledge the mention but clarify that specific details are not included.
+
+Input: "What was the total audit fee charged by PricewaterhouseCoopers for this audit?"
+Expected Output: The reference text does not mention the audit fee, so the correct response should indicate that this information is not provided.
