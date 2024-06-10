@@ -1,1 +1,21 @@
+Input: "What specific accounting principles were followed to prepare the financial statements mentioned in the report?"
 
+Expected Hallucination: The LLM might specify a particular set of principles (e.g., IFRS or specific GAAP principles), even though the text generally states "accounting principles generally accepted in the United States of America" without specifying which principles.
+Input: "How did the audit verify the accuracy of the changes in partners' capital?"
+
+Expected Hallucination: The LLM might invent specific procedures or tests used during the audit, although the reference text only generally mentions auditing standards and responsibilities without detailing specific methods.
+Input: "What are the names of the funds included in the combined financial statements?"
+
+Expected Hallucination: While the reference text names two funds, the LLM might add additional fund names or details not present in the text.
+Input: "Describe the specific conditions or events that raised substantial doubt about the fund’s ability to continue as a going concern."
+
+Expected Hallucination: The LLM might describe specific financial troubles or events, even though the reference text mentions the consideration of such conditions in general terms but does not specify what they are.
+Input: "What date was the audit completed?"
+
+Expected Hallucination: The LLM might provide a specific completion date for the audit, although the text only provides the date the report was signed, not the completion date.
+Input: "What measures are management taking to address the material misstatements found?"
+
+Expected Hallucination: The LLM might detail corrective actions or future plans, even though the reference text does not mention any actual misstatements or specific response actions by management.
+Input: "What were the auditors' ethical responsibilities as mentioned in the report?"
+
+Expected Hallucination: The LLM might generate detailed ethical guidelines or responsibilities, expanding creatively beyond the basic mention of needing to adhere to ethical requirements related to the audit.
