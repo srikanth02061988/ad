@@ -146,6 +146,7 @@ def generate_synthetic_data():
                 }
             }
             harmful_entry["ssc_RAI_gateway_attributes"].update(harmful_data)
+            data.append(input_entry)
             data.append(harmful_entry)
         else:
             # Generate output data along with input
@@ -182,8 +183,6 @@ def generate_synthetic_data():
             }
             data.append(input_entry)
             data.append(output_entry)
-        else:
-            data.append(input_entry)
     return data
 
 # Generate data
