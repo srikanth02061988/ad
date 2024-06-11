@@ -5,26 +5,21 @@ import random
 import os
 from faker import Faker
 
-# Initialize Faker
 fake = Faker()
 
-# Generate random UUID
 def generate_uuid():
     return str(uuid.uuid4())
 
-# Generate random timestamp within the same day
-def generate_timestamp(base_time=None):
+def generate_timestamp(base_time=None, delta_minutes=0):
     if base_time is None:
         base_time = datetime(2024, 3, 15, 10, 0, 0)
-    random_minutes = random.randint(0, 1440)  # 1440 minutes in a day
+    random_minutes = random.randint(0, delta_minutes)
     random_date = base_time + timedelta(minutes=random_minutes)
     return random_date.isoformat() + 'Z'
 
-# Generate a random user ID with the format of three alphabets, four numbers, and two letters
 def generate_user_id():
     return fake.lexify('???') + fake.numerify('####') + fake.lexify('??')
 
-# Predefined sets of prompts, responses, context, and grounding data
 data_sets = [
     {
         "prompt": "Tell me a fact about penguins.",
@@ -88,24 +83,20 @@ data_sets = [
     }
 ]
 
-# Harmful attributes including jailbreak and copyright
 harmful_attributes = ["Harmfulness", "Hateful", "SexualContent", "Violent Content", "Self-harm", "jailbreak", "copyright"]
 
-# Generate synthetic data
 def generate_synthetic_data():
     data = []
-    for _ in range(10):  # Generate 10 synthetic entries
+    for _ in range(10):
         index = random.randint(0, len(data_sets) - 1)
         data_set = data_sets[index]
-        
-        # Generate consistent session_id, user_id, environment, and region for each session
+
         session_id = generate_uuid()
         user_id = generate_user_id()
         environment = random.choice(["DEV", "QA"])
         region = random.choice(["na", "emea", "apac", "latm"])
         base_time = datetime(2024, 3, 15, 10, 0, 0)
-        
-        # Generate input data first
+
         input_entry = {
             "timestamp": generate_timestamp(base_time),
             "ssc_logging_standard.version": "0.1",
@@ -131,9 +122,8 @@ def generate_synthetic_data():
 
         data.append(input_entry)
 
-        # Add modeltokencount entry
         model_token_count_entry = {
-            "timestamp": generate_timestamp(base_time),
+            "timestamp": generate_timestamp(base_time, delta_minutes=5),
             "ssc_logging_standard.version": "0.1",
             "ssc_RAI_application_attributes": {
                 "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
@@ -153,9 +143,9 @@ def generate_synthetic_data():
         }
         data.append(model_token_count_entry)
 
-        if random.random() < 0.65:  # 65% chance to generate output
+        if random.random() < 0.65:
             output_entry = {
-                "timestamp": generate_timestamp(base_time),
+                "timestamp": generate_timestamp(base_time, delta_minutes=10),
                 "ssc_logging_standard.version": "0.1",
                 "ssc_RAI_application_attributes": {
                     "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
@@ -170,15 +160,14 @@ def generate_synthetic_data():
                     "ssc_RAI_attribute": "output",
                     "ssc_RAI_status": "complete",
                     "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"]),
-                    "ssc_RAI_prompt": data_set["prompt"],  # Include prompt here
+                    "ssc_RAI_prompt": data_set["response"],
                     "output_text_total_tokens": str(random.randint(100, 300))
                 }
             }
             data.append(output_entry)
 
-            # Add modellatency entry
             model_latency_entry = {
-                "timestamp": generate_timestamp(base_time),
+                "timestamp": generate_timestamp(base_time, delta_minutes=15),
                 "ssc_logging_standard.version": "0.1",
                 "ssc_RAI_application_attributes": {
                     "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
@@ -204,7 +193,7 @@ def generate_synthetic_data():
 
             for harmful_attr, value in harmful_data.items():
                 harmful_entry = {
-                    "timestamp": generate_timestamp(base_time),
+                    "timestamp": generate_timestamp(base_time, delta_minutes=10),
                     "ssc_logging_standard.version": "0.1",
                     "ssc_RAI_application_attributes": {
                         "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
@@ -226,10 +215,8 @@ def generate_synthetic_data():
 
     return data
 
-# Generate data
 synthetic_data = generate_synthetic_data()
 
-# Save to JSON file using the specified path mechanism
 output_file_path = os.path.expanduser('~/synthetic_data.json')
 with open(output_file_path, 'w') as f:
     json.dump(synthetic_data, f, indent=2)
