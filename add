@@ -95,6 +95,10 @@ def generate_synthetic_data():
         index = random.randint(0, len(data_sets) - 1)
         data_set = data_sets[index]
         
+        # Generate consistent session_id and user_id for each session
+        session_id = generate_uuid()
+        user_id = fake.user_name() + str(random.randint(1000, 9999))
+        
         # Generate input data first
         input_entry = {
             "timestamp": generate_timestamp(),
@@ -103,8 +107,8 @@ def generate_synthetic_data():
                 "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
                 "ssc_RAI_app_environment": random.choice(["DEV", "QA"]),
                 "ssc_RAI_region": random.choice(["na", "emea", "apac", "latm"]),
-                "ssc_RAI_session_id": generate_uuid(),
-                "ssc_RAI_user_id": fake.user_name() + str(random.randint(1000, 9999)),
+                "ssc_RAI_session_id": session_id,
+                "ssc_RAI_user_id": user_id,
                 "ssc_RAI_chainid": "1"
             },
             "ssc_RAI_requestResponse_attributes": {
@@ -119,6 +123,8 @@ def generate_synthetic_data():
             }
         }
 
+        data.append(input_entry)
+
         if random.random() < 0.65:  # 65% chance to generate output
             output_entry = {
                 "timestamp": generate_timestamp(),
@@ -127,8 +133,8 @@ def generate_synthetic_data():
                     "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
                     "ssc_RAI_app_environment": random.choice(["DEV", "QA"]),
                     "ssc_RAI_region": random.choice(["na", "emea", "apac", "latm"]),
-                    "ssc_RAI_session_id": generate_uuid(),
-                    "ssc_RAI_user_id": fake.user_name() + str(random.randint(1000, 9999)),
+                    "ssc_RAI_session_id": session_id,
+                    "ssc_RAI_user_id": user_id,
                     "ssc_RAI_chainid": "1"
                 },
                 "ssc_RAI_requestResponse_attributes": {
@@ -151,31 +157,29 @@ def generate_synthetic_data():
                     "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
                 }
             }
-            data.append(input_entry)
             data.append(output_entry)
         else:
-            harmful_attr = random.choice(harmful_attributes)
-            harmful_entry = {
-                "timestamp": generate_timestamp(),
-                "ssc_logging_standard.version": "0.1",
-                "ssc_RAI_application_attributes": {
-                    "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
-                    "ssc_RAI_app_environment": random.choice(["DEV", "QA"]),
-                    "ssc_RAI_region": random.choice(["na", "emea", "apac", "latm"]),
-                    "ssc_RAI_session_id": generate_uuid(),
-                    "ssc_RAI_user_id": fake.user_name() + str(random.randint(1000, 9999)),
-                    "ssc_RAI_chainid": "1"
-                },
-                "ssc_RAI_gateway_attributes": {
-                    "ssc_RAI_spanId": generate_uuid(),
-                    "ssc_RAI_traceType": "metric",
-                    "ssc_RAI_attribute": harmful_attr,
-                    "ssc_RAI_value": "1",  # Ensuring at least one harmful attribute is 1
-                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+            for harmful_attr in harmful_attributes:
+                harmful_entry = {
+                    "timestamp": generate_timestamp(),
+                    "ssc_logging_standard.version": "0.1",
+                    "ssc_RAI_application_attributes": {
+                        "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                        "ssc_RAI_app_environment": random.choice(["DEV", "QA"]),
+                        "ssc_RAI_region": random.choice(["na", "emea", "apac", "latm"]),
+                        "ssc_RAI_session_id": session_id,
+                        "ssc_RAI_user_id": user_id,
+                        "ssc_RAI_chainid": "1"
+                    },
+                    "ssc_RAI_gateway_attributes": {
+                        "ssc_RAI_spanId": generate_uuid(),
+                        "ssc_RAI_traceType": "metric",
+                        "ssc_RAI_attribute": harmful_attr,
+                        "ssc_RAI_value": "1",  # Ensuring at least one harmful attribute is 1
+                        "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+                    }
                 }
-            }
-            data.append(input_entry)
-            data.append(harmful_entry)
+                data.append(harmful_entry)
     return data
 
 # Generate data
