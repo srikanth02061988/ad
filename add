@@ -153,20 +153,12 @@ def generate_synthetic_data():
                     "ssc_RAI_context": data_set["context"],
                     "ssc_RAI_groundingData": data_set["grounding_data"],
                     "output_text_total_tokens": str(random.randint(100, 300))
-                },
-                "ssc_RAI_gateway_attributes": {
-                    "ssc_RAI_spanId": generate_uuid(),
-                    "ssc_RAI_traceType": "metric",
-                    "ssc_RAI_attribute": "modeltokencount",
-                    "ssc_RAI_value": str(random.randint(1, 100)),
-                    "modellatency": str(random.randint(1, 50)),
-                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
                 }
             }
             data.append(output_entry)
-        else:
-            harmful_attr = random.choice(harmful_attributes)
-            harmful_entry = {
+
+            # Adding separate entries for modeltokencount and modellatency
+            model_token_count_entry = {
                 "timestamp": generate_timestamp(),
                 "ssc_logging_standard.version": "0.1",
                 "ssc_RAI_application_attributes": {
@@ -180,12 +172,59 @@ def generate_synthetic_data():
                 "ssc_RAI_gateway_attributes": {
                     "ssc_RAI_spanId": generate_uuid(),
                     "ssc_RAI_traceType": "metric",
-                    "ssc_RAI_attribute": harmful_attr,
-                    "ssc_RAI_value": "1",  # Ensuring at least one harmful attribute is 1
+                    "ssc_RAI_attribute": "modeltokencount",
+                    "ssc_RAI_value": str(random.randint(1, 100)),
                     "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
                 }
             }
-            data.append(harmful_entry)
+            data.append(model_token_count_entry)
+
+            model_latency_entry = {
+                "timestamp": generate_timestamp(),
+                "ssc_logging_standard.version": "0.1",
+                "ssc_RAI_application_attributes": {
+                    "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                    "ssc_RAI_app_environment": environment,
+                    "ssc_RAI_region": region,
+                    "ssc_RAI_session_id": session_id,
+                    "ssc_RAI_user_id": user_id,
+                    "ssc_RAI_chainid": "1"
+                },
+                "ssc_RAI_gateway_attributes": {
+                    "ssc_RAI_spanId": generate_uuid(),
+                    "ssc_RAI_traceType": "metric",
+                    "ssc_RAI_attribute": "modellatency",
+                    "ssc_RAI_value": str(random.randint(1, 50)),
+                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+                }
+            }
+            data.append(model_latency_entry)
+        else:
+            harmful_data = {attr: 0 for attr in harmful_attributes}
+            harmful_attr = random.choice(harmful_attributes)
+            harmful_data[harmful_attr] = 1
+
+            for harmful_attr, value in harmful_data.items():
+                harmful_entry = {
+                    "timestamp": generate_timestamp(),
+                    "ssc_logging_standard.version": "0.1",
+                    "ssc_RAI_application_attributes": {
+                        "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                        "ssc_RAI_app_environment": environment,
+                        "ssc_RAI_region": region,
+                        "ssc_RAI_session_id": session_id,
+                        "ssc_RAI_user_id": user_id,
+                        "ssc_RAI_chainid": "1"
+                    },
+                    "ssc_RAI_gateway_attributes": {
+                        "ssc_RAI_spanId": generate_uuid(),
+                        "ssc_RAI_traceType": "metric",
+                        "ssc_RAI_attribute": harmful_attr,
+                        "ssc_RAI_value": str(value),
+                        "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+                    }
+                }
+                data.append(harmful_entry)
     return data
 
 # Generate data
@@ -197,4 +236,3 @@ with open(output_file_path, 'w') as f:
     json.dump(synthetic_data, f, indent=2)
 
 print(f"Synthetic data has been generated and saved to '{output_file_path}'")
-
