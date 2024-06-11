@@ -131,6 +131,28 @@ def generate_synthetic_data():
 
         data.append(input_entry)
 
+        # Add modeltokencount entry
+        model_token_count_entry = {
+            "timestamp": generate_timestamp(),
+            "ssc_logging_standard.version": "0.1",
+            "ssc_RAI_application_attributes": {
+                "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                "ssc_RAI_app_environment": environment,
+                "ssc_RAI_region": region,
+                "ssc_RAI_session_id": session_id,
+                "ssc_RAI_user_id": user_id,
+                "ssc_RAI_chainid": "1"
+            },
+            "ssc_RAI_gateway_attributes": {
+                "ssc_RAI_spanId": generate_uuid(),
+                "ssc_RAI_traceType": "metric",
+                "ssc_RAI_attribute": "modeltokencount",
+                "ssc_RAI_value": str(random.randint(1, 100)),
+                "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+            }
+        }
+        data.append(model_token_count_entry)
+
         if random.random() < 0.65:  # 65% chance to generate output
             output_entry = {
                 "timestamp": generate_timestamp(),
@@ -157,28 +179,7 @@ def generate_synthetic_data():
             }
             data.append(output_entry)
 
-            # Adding separate entries for modeltokencount and modellatency
-            model_token_count_entry = {
-                "timestamp": generate_timestamp(),
-                "ssc_logging_standard.version": "0.1",
-                "ssc_RAI_application_attributes": {
-                    "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
-                    "ssc_RAI_app_environment": environment,
-                    "ssc_RAI_region": region,
-                    "ssc_RAI_session_id": session_id,
-                    "ssc_RAI_user_id": user_id,
-                    "ssc_RAI_chainid": "1"
-                },
-                "ssc_RAI_gateway_attributes": {
-                    "ssc_RAI_spanId": generate_uuid(),
-                    "ssc_RAI_traceType": "metric",
-                    "ssc_RAI_attribute": "modeltokencount",
-                    "ssc_RAI_value": str(random.randint(1, 100)),
-                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
-                }
-            }
-            data.append(model_token_count_entry)
-
+            # Add modellatency entry
             model_latency_entry = {
                 "timestamp": generate_timestamp(),
                 "ssc_logging_standard.version": "0.1",
@@ -225,6 +226,31 @@ def generate_synthetic_data():
                     }
                 }
                 data.append(harmful_entry)
+
+            # Do not add output or modellatency if harmful content is present
+            if any(value == 1 for value in harmful_data.values()):
+                for harmful_attr, value in harmful_data.items():
+                    harmful_entry = {
+                        "timestamp": generate_timestamp(),
+                        "ssc_logging_standard.version": "0.1",
+                        "ssc_RAI_application_attributes": {
+                            "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                            "ssc_RAI_app_environment": environment,
+                            "ssc_RAI_region": region,
+                            "ssc_RAI_session_id": session_id,
+                            "ssc_RAI_user_id": user_id,
+                            "ssc_RAI_chainid": "1"
+                        },
+                        "ssc_RAI_gateway_attributes": {
+                            "ssc_RAI_spanId": generate_uuid(),
+                            "ssc_RAI_traceType": "metric",
+                            "ssc_RAI_attribute": harmful_attr,
+                            "ssc_RAI_value": str(value),
+                            "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+                        }
+                    }
+                    data.append(harmful_entry)
+
     return data
 
 # Generate data
