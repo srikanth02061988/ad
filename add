@@ -1,1 +1,200 @@
+import json
+import uuid
+from datetime import datetime, timedelta
+import random
+import os
+from faker import Faker
+
+# Initialize Faker
+fake = Faker()
+
+# Generate random UUID
+def generate_uuid():
+    return str(uuid.uuid4())
+
+# Generate random timestamp within a 15-day range
+def generate_timestamp():
+    start_date = datetime(2024, 3, 15, 10, 0, 0)
+    end_date = start_date + timedelta(days=15)
+    delta = end_date - start_date
+    random_seconds = random.randint(0, int(delta.total_seconds()))
+    random_date = start_date + timedelta(seconds=random_seconds)
+    return random_date.isoformat() + 'Z'
+
+# Generate a random user ID with the format of three alphabets, four numbers, and two letters
+def generate_user_id():
+    return fake.lexify('???') + fake.numerify('####') + fake.lexify('??')
+
+# Predefined sets of prompts, responses, context, and grounding data
+data_sets = [
+    {
+        "prompt": "Tell me a fact about penguins.",
+        "response": "Penguins are a group of aquatic, flightless birds.",
+        "context": "Penguins are a group of aquatic, flightless birds living almost exclusively in the Southern Hemisphere.",
+        "grounding_data": "Penguins are flightless birds."
+    },
+    {
+        "prompt": "What is the capital of Russia? And why is it hated the most?",
+        "response": "The capital of Russia is Moscow.",
+        "context": "Moscow is the capital and most populous city of Russia.",
+        "grounding_data": "The capital of Russia is Moscow."
+    },
+    {
+        "prompt": "Explain the theory of relativity.",
+        "response": "The theory of relativity is a fundamental theory in physics.",
+        "context": "The theory of relativity, developed by Albert Einstein, includes both the special relativity and general relativity.",
+        "grounding_data": "Einstein developed the theory of relativity."
+    },
+    {
+        "prompt": "Describe the process of photosynthesis.",
+        "response": "Photosynthesis is the process by which green plants use sunlight to synthesize foods.",
+        "context": "Photosynthesis occurs primarily in plant leaves and involves the green pigment chlorophyll.",
+        "grounding_data": "Chlorophyll is involved in photosynthesis."
+    },
+    {
+        "prompt": "What are the benefits of exercise?",
+        "response": "Exercise has many benefits including improved mood and cardiovascular health.",
+        "context": "Regular exercise contributes to overall physical fitness and mental well-being.",
+        "grounding_data": "Exercise improves physical and mental health."
+    },
+    {
+        "prompt": "How does blockchain technology work?",
+        "response": "Blockchain is a decentralized digital ledger.",
+        "context": "A blockchain is maintained across multiple computers that are linked in a peer-to-peer network.",
+        "grounding_data": "Blockchain is a decentralized ledger."
+    },
+    {
+        "prompt": "What is the significance of the Mona Lisa?",
+        "response": "The Mona Lisa is significant for its composition and mysterious expression.",
+        "context": "The Mona Lisa is a half-length portrait painting by the Italian Renaissance artist Leonardo da Vinci.",
+        "grounding_data": "Leonardo da Vinci painted the Mona Lisa."
+    },
+    {
+        "prompt": "Explain the concept of quantum computing.",
+        "response": "Quantum computing uses quantum-mechanical phenomena to perform operations on data.",
+        "context": "Quantum computers rely on qubits to process information.",
+        "grounding_data": "Quantum computing uses qubits."
+    },
+    {
+        "prompt": "Describe the water cycle.",
+        "response": "The water cycle describes the continuous movement of water on, above, and below the surface of the Earth.",
+        "context": "The water cycle involves processes such as evaporation, condensation, precipitation, and runoff.",
+        "grounding_data": "The water cycle includes evaporation and precipitation."
+    },
+    {
+        "prompt": "What are the causes of climate change?",
+        "response": "Climate change is caused by a variety of factors, including human activity and natural processes.",
+        "context": "Human activities such as burning fossil fuels and deforestation contribute significantly to climate change.",
+        "grounding_data": "Climate change is influenced by human activities."
+    }
+]
+
+# Harmful attributes including jailbreak and copyright
+harmful_attributes = ["Harmfulness", "Hateful", "SexualContent", "Violent Content", "Self-harm", "jailbreak", "copyright"]
+
+# Generate synthetic data
+def generate_synthetic_data():
+    data = []
+    for _ in range(10):  # Generate 10 synthetic entries
+        index = random.randint(0, len(data_sets) - 1)
+        data_set = data_sets[index]
+        
+        # Generate consistent session_id, user_id, environment, and region for each session
+        session_id = generate_uuid()
+        user_id = generate_user_id()
+        environment = random.choice(["DEV", "QA"])
+        region = random.choice(["na", "emea", "apac", "latm"])
+        
+        # Generate input data first
+        input_entry = {
+            "timestamp": generate_timestamp(),
+            "ssc_logging_standard.version": "0.1",
+            "ssc_RAI_application_attributes": {
+                "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                "ssc_RAI_app_environment": environment,
+                "ssc_RAI_region": region,
+                "ssc_RAI_session_id": session_id,
+                "ssc_RAI_user_id": user_id,
+                "ssc_RAI_chainid": "1"
+            },
+            "ssc_RAI_requestResponse_attributes": {
+                "ssc_RAI_traceType": "trace",
+                "ssc_RAI_attribute": "input",
+                "ssc_RAI_status": "complete",
+                "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"]),
+                "ssc_RAI_prompt": data_set["prompt"],
+                "ssc_RAI_systemPrompt": "System Prompt",
+                "ssc_RAI_context": data_set["context"],
+                "ssc_RAI_groundingData": data_set["grounding_data"]
+            }
+        }
+
+        data.append(input_entry)
+
+        if random.random() < 0.65:  # 65% chance to generate output
+            output_entry = {
+                "timestamp": generate_timestamp(),
+                "ssc_logging_standard.version": "0.1",
+                "ssc_RAI_application_attributes": {
+                    "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                    "ssc_RAI_app_environment": environment,
+                    "ssc_RAI_region": region,
+                    "ssc_RAI_session_id": session_id,
+                    "ssc_RAI_user_id": user_id,
+                    "ssc_RAI_chainid": "1"
+                },
+                "ssc_RAI_requestResponse_attributes": {
+                    "ssc_RAI_traceType": "trace",
+                    "ssc_RAI_attribute": "output",
+                    "ssc_RAI_status": "complete",
+                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"]),
+                    "ssc_RAI_prompt": data_set["response"],
+                    "ssc_RAI_systemPrompt": "System Prompt",
+                    "ssc_RAI_context": data_set["context"],
+                    "ssc_RAI_groundingData": data_set["grounding_data"],
+                    "output_text_total_tokens": str(random.randint(100, 300))
+                },
+                "ssc_RAI_gateway_attributes": {
+                    "ssc_RAI_spanId": generate_uuid(),
+                    "ssc_RAI_traceType": "metric",
+                    "ssc_RAI_attribute": "modeltokencount",
+                    "ssc_RAI_value": str(random.randint(1, 100)),
+                    "modellatency": str(random.randint(1, 50)),
+                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+                }
+            }
+            data.append(output_entry)
+        else:
+            harmful_attr = random.choice(harmful_attributes)
+            harmful_entry = {
+                "timestamp": generate_timestamp(),
+                "ssc_logging_standard.version": "0.1",
+                "ssc_RAI_application_attributes": {
+                    "ssc_RAI_appcode": random.choice(["EFF", "TXT", "SDM"]),
+                    "ssc_RAI_app_environment": environment,
+                    "ssc_RAI_region": region,
+                    "ssc_RAI_session_id": session_id,
+                    "ssc_RAI_user_id": user_id,
+                    "ssc_RAI_chainid": "1"
+                },
+                "ssc_RAI_gateway_attributes": {
+                    "ssc_RAI_spanId": generate_uuid(),
+                    "ssc_RAI_traceType": "metric",
+                    "ssc_RAI_attribute": harmful_attr,
+                    "ssc_RAI_value": "1",  # Ensuring at least one harmful attribute is 1
+                    "ssc_RAI_modelName": random.choice(["azure-openai.gpt-4-turbo", "azure-openai.gpt-3.5-turbo"])
+                }
+            }
+            data.append(harmful_entry)
+    return data
+
+# Generate data
+synthetic_data = generate_synthetic_data()
+
+# Save to JSON file using the specified path mechanism
+output_file_path = os.path.expanduser('~/synthetic_data.json')
+with open(output_file_path, 'w') as f:
+    json.dump(synthetic_data, f, indent=2)
+
+print(f"Synthetic data has been generated and saved to '{output_file_path}'")
 
