@@ -1,1 +1,64 @@
+[
+    {
+        "timestamp": "2024-03-15T10:01:30.500Z",
+        "ssc_logging_standard.version": "0.1",
+        "ssc_RAI_application_attributes": {
+            "ssc_RAI_appcode": "EFF/TXT/SDM",
+            "ssc_RAI_app_environment": "DEV/QA",
+            "ssc_RAI_region": "na/emea/apac/latm",
+            "ssc_RAI_session_id": "4c77bded-4515-4c34-a297-affde91a8e44",
+            "ssc_RAI_user_id": "rl-1947-HJt",
+            "ssc_RAI_chainid": "1"
+        },
+        "ssc_RAI_requestResponse_attributes": {
+            "ssc_RAI_traceType": "trace",
+            "ssc_RAI_attribute": "input",
+            "ssc_RAI_status": "complete",
+            "ssc_RAI_modelName": "azure-openai.gpt-4-turbo",
+            "ssc_RAI_prompt": "Random input",
+            "ssc_RAI_systemPrompt": "System Prompt",
+            "ssc_RAI_context": "context data to the Llm",
+            "ssc_RAI_groundingData": "optional add grounding data if present"
+        }
+    },
+    {
+        "timestamp": "2024-03-15T10:01:30.500Z",
+        "ssc_logging_standard.version": "0.1",
+        "ssc_RAI_application_attributes": {
+            "ssc_RAI_appcode": "EFF/TXT/SDM",
+            "ssc_RAI_app_environment": "DEV/QA",
+            "ssc_RAI_region": "na/emea/apac/latm",
+            "ssc_RAI_session_id": "4c77bded-4515-4c34-a297-affde91a8e44",
+            "ssc_RAI_user_id": "rl-1947-HJt",
+            "ssc_RAI_chainid": "1"
+        },
+        "ssc_RAI_requestResponse_attributes": {
+            "ssc_RAI_traceType": "trace",
+            "ssc_RAI_attribute": "output",
+            "ssc_RAI_status": "complete",
+            "ssc_RAI_modelName": "azure-openai.gpt-4-turbo",
+            "ssc_RAI_prompt": "output response from the llm"
+        }
+    },
+    {
+        "timestamp": "2024-03-15T10:01:30.500Z",
+        "ssc_logging_standard.version": "0.1",
+        "ssc_RAI_application_attributes": {
+            "ssc_RAI_appcode": "EFF/TXT/SDM",
+            "ssc_RAI_app_environment": "DEV/QA",
+            "ssc_RAI_region": "na/emea/apac/latm",
+            "ssc_RAI_session_id": "4c77bded-4515-4c34-a297-affde91a8e44",
+            "ssc_RAI_user_id": "rl-1947-HJt",
+            "ssc_RAI_chainid": "1"
+        },
+        "ssc_RAI_gateway_attributes": {
+            "ssc_RAI_spanId": "spanid",
+            "ssc_RAI_traceType": "metric",
+            "ssc_RAI_attribute": "modeltokencount",
+            "ssc_RAI_value": "50",
+            "ssc_RAI_CFvalue": "The token count of the input is 50",
+            "ssc_RAI_modelName": "azure-openai.gpt-4-turbo"
+        }
+    }
+]
 
