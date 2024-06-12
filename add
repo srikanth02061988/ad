@@ -1,1 +1,111 @@
+import json
+from openai import AzureOpenAI
+
+client = AzureOpenAI(
+    api_version="2024-02-01",
+    azure_endpoint="https://effopenai.openai.azure.com/",
+    api_key="7896c56d537d4f19803a4ac85bd9bc9"
+)
+
+def call_llm_model(prompt):
+    response = client.chat.completions.create(
+        model="ajitTest",
+        messages=[
+            {"role": "system", "content": "Assistant is a large language model trained by OpenAI."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response.choices[0].message.content.strip()
+
+def generate_sample_outputs(reference_text, input_text, num_samples=5):
+    sample_outputs = []
+    prompt = f"Reference: {reference_text}\nInput: {input_text}\nPlease provide a response based on the reference and input."
+
+    for _ in range(num_samples):
+        sample_output = call_llm_model(prompt)
+        sample_outputs.append(sample_output)
+
+    return sample_outputs
+
+def consistency_check(reference_text, input_text, original_output, sample_output):
+    prompt = f"""
+    Reference: {reference_text}
+    Input: {input_text}
+    Original Output: {original_output}
+    Sample Output: {sample_output}
+    Does the sample output support the original output? Answer "Yes" or "No" and provide a brief explanation.
+    """
+    response = call_llm_model(prompt)
+    return response
+
+def detect_closed_domain_hallucination(reference_text, input_text, original_output, num_samples=5, threshold=0.5):
+    sample_outputs = generate_sample_outputs(reference_text, input_text, num_samples)
+    consistency_responses = []
+    consistency_scores = []
+
+    for sample_output in sample_outputs:
+        response = consistency_check(reference_text, input_text, original_output, sample_output)
+        consistency_responses.append(response)
+        consistency_scores.append(1 if "yes" in response.lower() else 0)
+
+    # Calculate the hallucination score
+    hallucination_score = sum(consistency_scores) / num_samples
+    is_hallucination = hallucination_score < threshold
+    judgment = "No Hallucination" if is_hallucination else "Hallucination detected"
+
+    results = {
+        "reference_text": reference_text,
+        "input_text": input_text,
+        "original_output": original_output,
+        "sample_outputs": sample_outputs,
+        "consistency_responses": consistency_responses,
+        "consistency_scores": consistency_scores,
+        "hallucination_score": hallucination_score,
+        "is_hallucination": is_hallucination,
+        "judgment": judgment
+    }
+
+    return results
+
+data = [
+    {
+        "reference": "Penguins are a group of aquatic, flightless birds living almost exclusively in the Southern Hemisphere.",
+        "input": "Tell me a fact about penguins.",
+        "output": "Penguins can fly in the same way that airplanes do."
+    },
+    {
+        "reference": "Paris is the capital and most populous city of France.",
+        "input": "What is the capital of France?",
+        "output": "The capital of France is Paris."
+    }
+]
+
+num_samples = 5
+all_results = []
+
+for row in data:
+    reference_text = row.get('reference')
+    input_prompt = row.get('input')
+    original_output = row.get('output')
+
+    if reference_text and input_prompt and original_output:
+        results = detect_closed_domain_hallucination(reference_text, input_prompt, original_output, num_samples)
+        all_results.append(results)
+        print(f"Reference: {reference_text}")
+        print(f"Input: {input_prompt}")
+        print(f"Original Output: {original_output}")
+        print(f"Sample Outputs: {results['sample_outputs']}")
+        print(f"Consistency Responses: {results['consistency_responses']}")
+        print(f"Consistency Scores: {results['consistency_scores']}")
+        print(f"Hallucination Score: {results['hallucination_score']}")
+        print(f"Is Hallucination: {results['is_hallucination']}")
+        print(f"Judgment: {results['judgment']}")
+        print("="*80)
+
+# Save results to a JSON file
+results_path = "/path/to/save/results.json"  # Update with your desired save path
+with open(results_path, 'w') as file:
+    json.dump(all_results, file, indent=4)
+
+print(f"Results saved to {results_path}")
 
