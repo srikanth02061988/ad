@@ -1,25 +1,9 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType, DoubleType, BooleanType
-
-# Initialize Spark session
-spark = SparkSession.builder \
-    .appName("CreateResultsTable") \
-    .getOrCreate()
-
-# Define the schema for the results table
-results_schema = StructType([
-    StructField("timestamp", TimestampType(), True),
-    StructField("ssc_RAI_session_id", StringType(), True),
-    StructField("ssc_RAI_chainid", StringType(), True),
-    StructField("ssc_RAI_appcode", StringType(), True),
-    StructField("hallucination_score", DoubleType(), True),
-    StructField("is_hallucination", BooleanType(), True)
-])
-
-# Create an empty DataFrame with the schema
-empty_df = spark.createDataFrame([], results_schema)
-
-# Write the empty DataFrame to create the Delta table
-empty_df.write.format("delta").mode("overwrite").saveAsTable("rai_payload_synth_results")
-
-print("Results table created successfully.")
+-- Define your parameters (these will be replaced by the dashboard's input)
+SELECT timestamp,
+       ssc_RAI_application_attributes.ssc_RAI_appcode AS appcode,
+       ssc_RAI_application_attributes.ssc_RAI_session_id AS sessionid,
+       ssc_RAI_application_attributes.ssc_RAI_chainid AS chainid,
+       CAST(ssc_RAI_gateway_attributes.ssc_RAI_value AS INT) AS modeltoken_count
+FROM delta.`dbfs:/FileStore/synthetic_data_new_hallucination_v5.json`
+WHERE ssc_RAI_application_attributes.ssc_RAI_traceType = 'metric'
+  AND timestamp BETWEEN '{{start_date}}' AND '{{end_date}}'
