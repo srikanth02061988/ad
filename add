@@ -1,9 +1,1 @@
--- Define your parameters (these will be replaced by the dashboard's input)
-SELECT timestamp,
-       ssc_RAI_application_attributes.ssc_RAI_appcode AS appcode,
-       ssc_RAI_application_attributes.ssc_RAI_session_id AS sessionid,
-       ssc_RAI_application_attributes.ssc_RAI_chainid AS chainid,
-       CAST(ssc_RAI_gateway_attributes.ssc_RAI_value AS INT) AS modeltoken_count
-FROM delta.`dbfs:/FileStore/synthetic_data_new_hallucination_v5.json`
-WHERE ssc_RAI_application_attributes.ssc_RAI_traceType = 'metric'
-  AND timestamp BETWEEN '{{start_date}}' AND '{{end_date}}'
+
