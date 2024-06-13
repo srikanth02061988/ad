@@ -20,7 +20,6 @@ results_schema = StructType([
 empty_df = spark.createDataFrame([], results_schema)
 
 # Write the empty DataFrame to create the Delta table
-empty_df.write.format("delta").mode("overwrite").save("/path/to/save/results")
+empty_df.write.format("delta").mode("overwrite").saveAsTable("rai_payload_synth_results")
 
 print("Results table created successfully.")
-
