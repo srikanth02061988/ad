@@ -1,1 +1,93 @@
+WITH subquery1 AS (
+    SELECT
+        ssc_RAI_application_attributes.ssc_RAI_session_id AS sessionid,
+        ssc_RAI_application_attributes.ssc_RAI_chainid AS chainId,
+        ssc_RAI_application_attributes.ssc_RAI_appcode AS appCode,
+        ssc_RAI_application_attributes.ssc_RAI_app_environment AS app_environment,
+        ssc_RAI_application_attributes.ssc_RAI_region AS region,
+        date_trunc('day', timestamp) AS timestamp,
+        AVG(CAST(ssc_RAI_requestResponse_attributes.output_text_total_tokens AS INT)) AS outputtokens
+    FROM hive_metastore.default.rai_payload_synth_v4
+    WHERE
+        ssc_RAI_application_attributes.ssc_RAI_session_id = :sessionId
+        AND ssc_RAI_application_attributes.ssc_RAI_appcode = :appCode
+        AND ssc_RAI_application_attributes.ssc_RAI_app_environment = :app_environment
+        AND ssc_RAI_application_attributes.ssc_RAI_region = :region
+        AND (
+            ssc_RAI_gateway_attributes.ssc_RAI_traceType = 'trace'
+            OR ssc_RAI_requestResponse_attributes.ssc_RAI_attribute = 'output'
+        )
+        AND timestamp BETWEEN '2024-03-15' AND '2024-03-31'
+    GROUP BY
+        ssc_RAI_application_attributes.ssc_RAI_session_id,
+        ssc_RAI_application_attributes.ssc_RAI_chainid,
+        ssc_RAI_application_attributes.ssc_RAI_appcode,
+        ssc_RAI_application_attributes.ssc_RAI_app_environment,
+        ssc_RAI_application_attributes.ssc_RAI_region,
+        date_trunc('day', timestamp)
+),
+
+-- Subquery 2: Calculating various attributes
+subquery2 AS (
+    SELECT
+        ssc_RAI_application_attributes.ssc_RAI_session_id AS sessionid,
+        ssc_RAI_application_attributes.ssc_RAI_chainid AS chainId,
+        ssc_RAI_application_attributes.ssc_RAI_appcode AS appCode,
+        ssc_RAI_application_attributes.ssc_RAI_app_environment AS app_environment,
+        ssc_RAI_application_attributes.ssc_RAI_region AS region,
+        date_trunc('day', timestamp) AS timestamp,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'jailbreak' THEN 1 ELSE 0 END) AS jailbreak,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'self-harm' THEN 1 ELSE 0 END) AS selfharm,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'Hateful' THEN 1 ELSE 0 END) AS Hateful,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'Violent Content' THEN 1 ELSE 0 END) AS ViolentContent,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'Copyright' THEN 1 ELSE 0 END) AS Copyright,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'SexualContent' THEN 1 ELSE 0 END) AS SexualContent,
+        MAX(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'Harmfulness' THEN 1 ELSE 0 END) AS Harmfulness,
+        AVG(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'modeltokencount' THEN CAST(ssc_RAI_gateway_attributes.ssc_RAI_value AS INT) ELSE NULL END) AS modeltokencount,
+        AVG(CASE WHEN ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'modellatency' THEN CAST(ssc_RAI_gateway_attributes.ssc_RAI_value AS INT) ELSE NULL END) AS modellatency
+    FROM hive_metastore.default.rai_payload_synth_v4
+    WHERE
+        ssc_RAI_application_attributes.ssc_RAI_session_id = :sessionId
+        AND ssc_RAI_application_attributes.ssc_RAI_appcode = :appCode
+        AND ssc_RAI_application_attributes.ssc_RAI_app_environment = :app_environment
+        AND ssc_RAI_application_attributes.ssc_RAI_region = :region
+        AND ssc_RAI_gateway_attributes.ssc_RAI_traceType = 'trace'
+        AND ssc_RAI_gateway_attributes.ssc_RAI_attribute IN ('jailbreak', 'self-harm', 'Hateful', 'Violent Content', 'Copyright', 'SexualContent', 'Harmfulness', 'modeltokencount', 'modellatency')
+        AND timestamp BETWEEN '2024-03-15' AND '2024-03-31'
+    GROUP BY
+        ssc_RAI_application_attributes.ssc_RAI_session_id,
+        ssc_RAI_application_attributes.ssc_RAI_chainid,
+        ssc_RAI_application_attributes.ssc_RAI_appcode,
+        ssc_RAI_application_attributes.ssc_RAI_app_environment,
+        ssc_RAI_application_attributes.ssc_RAI_region,
+        date_trunc('day', timestamp)
+)
+
+-- Main Query: Joining the subqueries
+SELECT
+    t1.timestamp,
+    t1.chainId,
+    t1.appCode,
+    t1.app_environment,
+    t1.sessionId,
+    t1.region,
+    t1.outputtokens,
+    t2.jailbreak,
+    t2.Harmfulness,
+    t2.Hateful,
+    t2.Selfharm,
+    t2.ViolentContent,
+    t2.Copyright,
+    t2.SexualContent,
+    t2.modeltokencount,
+    t2.modellatency
+FROM subquery1 AS t1
+LEFT JOIN subquery2 AS t2
+ON t1.sessionId = t2.sessionId
+AND t1.chainId = t2.chainId
+AND t1.appCode = t2.appCode
+AND t1.app_environment = t2.app_environment
+AND t1.region = t2.region
+AND t1.timestamp = t2.timestamp
+ORDER BY t1.sessionId
 
