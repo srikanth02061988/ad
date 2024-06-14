@@ -1,14 +1,1 @@
--- SQL query to include timestamp, session ID, and average token count
-SELECT 
-    ssc_RAI_application_attributes.ssc_RAI_session_id AS sessionid,
-    MIN(timestamp) AS timestamp,
-    AVG(CAST(ssc_RAI_gateway_attributes.ssc_RAI_value AS INT)) AS avg_modeltoken_count
-FROM delta.`dbfs:/FileStore/synthetic_data_new_hallucination_v5.json`
-WHERE 
-    ssc_RAI_application_attributes.ssc_RAI_traceType = 'metric'
-    AND ssc_RAI_gateway_attributes.ssc_RAI_attribute = 'modeltokencount'
-    AND timestamp BETWEEN '2024-01-01' AND '2024-01-31'
-GROUP BY 
-    ssc_RAI_application_attributes.ssc_RAI_session_id
-ORDER BY 
-    sessionid
+MAX(CASE WHEN CAST(ssc_RAI_gateway_attributes.ssc_RAI_value AS INT) > 0 THEN 1 ELSE 0 END)
