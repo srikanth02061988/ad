@@ -1,18 +1,24 @@
-# Read the Delta table
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .appName("RemoveColumnFromDeltaTable") \
+    .getOrCreate()
+
 delta_table = spark.read.format("delta").load("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
 
-# Print the schema of the table
+print("Schema before dropping column:")
 delta_table.printSchema()
 
-# Drop the 'event_timestamp' column if it exists
 if 'event_timestamp' in delta_table.columns:
     delta_table = delta_table.drop("event_timestamp")
     print("Dropped 'event_timestamp' column from the Delta table.")
 else:
     print("'event_timestamp' column does not exist in the Delta table.")
 
-# Overwrite the table without the 'event_timestamp' column
 delta_table.write.format("delta").option("mergeSchema", "true").mode("overwrite").save("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
 
-print("Updated Delta table saved without 'event_timestamp' column.")
+updated_table = spark.read.format("delta").load("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
+print("Schema after dropping column:")
+updated_table.printSchema()
 
+print("Updated Delta table saved without 'event_timestamp' column.")
