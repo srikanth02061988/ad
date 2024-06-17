@@ -1,14 +1,10 @@
-results_df = spark.createDataFrame(all_results)
-print("Converted results to DataFrame.")
+# Read the Delta table
+delta_table = spark.read.format("delta").load("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
 
-# Save results to Delta table with schema merging enabled
-results_df.select(
-    "timestamp", 
-    "ssc_RAI_session_id", 
-    "ssc_RAI_chainid", 
-    "ssc_RAI_appcode", 
-    "hallucination_score", 
-    "is_hallucination"
-).write.format("delta").option("mergeSchema", "true").mode("overwrite").save("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
+# Drop the 'event_timestamp' column
+delta_table = delta_table.drop("event_timestamp")
 
-print("Saved results to Delta table with 'timestamp'.")
+# Overwrite the table without the 'event_timestamp' column
+delta_table.write.format("delta").option("mergeSchema", "true").mode("overwrite").save("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
+
+print("Dropped 'event_timestamp' column from the Delta table.")
