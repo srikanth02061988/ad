@@ -1,8 +1,9 @@
-# Step 1: Write initial results with event_timestamp
-results_df = results_df.withColumnRenamed("timestamp", "event_timestamp")
+results_df = spark.createDataFrame(all_results)
+print("Converted results to DataFrame.")
 
+# Save results to Delta table with schema merging enabled
 results_df.select(
-    "event_timestamp", 
+    "timestamp", 
     "ssc_RAI_session_id", 
     "ssc_RAI_chainid", 
     "ssc_RAI_appcode", 
@@ -10,15 +11,4 @@ results_df.select(
     "is_hallucination"
 ).write.format("delta").option("mergeSchema", "true").mode("overwrite").save("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
 
-print("Saved results to Delta table with 'event_timestamp'.")
-
-# Step 2: Read the table back
-delta_table = spark.read.format("delta").load("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
-
-# Step 3: Rename event_timestamp back to timestamp and drop duplicates if any
-final_df = delta_table.withColumnRenamed("event_timestamp", "timestamp")
-
-# Save the final results back to the Delta table
-final_df.write.format("delta").option("mergeSchema", "true").mode("overwrite").save("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
-
-print("Final results saved to Delta table with 'timestamp'.")
+print("Saved results to Delta table with 'timestamp'.")
