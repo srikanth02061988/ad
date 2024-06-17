@@ -1,1 +1,13 @@
+results_df = results_df.withColumnRenamed("timestamp", "event_timestamp")
 
+# Save results to Delta table
+results_df.select(
+    "event_timestamp", 
+    "ssc_RAI_session_id", 
+    "ssc_RAI_chainid", 
+    "ssc_RAI_appcode", 
+    "hallucination_score", 
+    "is_hallucination"
+).write.format("delta").mode("overwrite").save("dbfs:/user/hive/warehouse/rai_payload_synth_hallucination_results")
+
+print("Saved results to Delta table.")
