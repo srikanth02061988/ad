@@ -1,16 +1,1 @@
-def call_llm_model(system_prompt, user_prompt):
-    """Calls the LLM model with the given prompts and returns the response."""
-    try:
-        response = client.chat.completions.create(
-            model="ajitTest",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-        )
-        output = response.choices[0].message.content.strip()
-        return output
-    except Exception as e:
-        print(f"Error calling LLM model: {e}")
-        return None
 
